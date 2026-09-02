@@ -1972,5 +1972,28 @@ window.addEventListener('resize',()=>{paint();});
 
 })();
 </script>
+
+  <script>
+/* CoinGecko direct — CORS-enabled, no proxy, no signup */
+(function(){
+  async function crypto(){
+    try{
+      const r = await fetch('https://api.coingecko.com/api/v3/simple/price' +
+        '?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true');
+      const j = await r.json();
+      const put = (id, o) => {
+        if(!o || !INST[id]) return;
+        const i = INST[id];
+        i.px = o.usd; i.chg = o.usd_24h_change || 0;
+        i.prev = i.px / (1 + i.chg/100);
+        i.hist.push(i.px); if(i.hist.length > 60) i.hist.shift();
+      };
+      put('BTC', j.bitcoin); put('ETH', j.ethereum);
+      paint();
+    }catch(e){ console.warn('crypto:', e.message); }
+  }
+  crypto(); setInterval(crypto, 60000);
+})();
+</script>
 </body>
 </html>
