@@ -1,219 +1,243 @@
 /* ============================================================
-   FinDeck — market data collector
-   Runs on GitHub Actions. Writes data/market.json
-   Every source is independent: one failing never stops the rest.
+   FinDeck data fetcher — runs on GitHub Actions
+   Writes data/market.json
    ============================================================ */
 
 const fs = require('fs');
 const path = require('path');
 
-const OUT_DIR = path.join(__dirname, '..', 'data');
-fs.mkdirSync(OUT_DIR, { recursive: true });
+const OUT = path.join(__dirname, '..', 'data', 'market.json');
 
-const out = {
-  builtAt: new Date().toISOString(),
-  sources: {},
-  indices: {},
-  stocks: {},
-  quotes: {},
-  funds: {}
+/* ---------- symbol map: yahoo symbol -> dashboard id ---------- */
+const MAP = {
+  // Indian indices
+  '^NSEI'      : 'NIFTY50',
+  '^BSESN'     : 'SENSEX',
+  '^NSEBANK'   : 'BANKNIFTY',
+  '^CNXFIN'    : 'FINNIFTY',
+  '^NSEMDCP50' : 'MIDCAP',
+  '^CNXSC'     : 'SMALLCAP',
+  '^INDIAVIX'  : 'VIX',
+  // Indian sectors
+  '^CNXIT'      : 'S_IT',
+  '^CNXAUTO'    : 'S_AUTO',
+  '^CNXFMCG'    : 'S_FMCG',
+  '^CNXPHARMA'  : 'S_PHARMA',
+  '^CNXMETAL'   : 'S_METAL',
+  '^CNXREALTY'  : 'S_REALTY',
+  '^CNXENERGY'  : 'S_ENERGY',
+  '^CNXPSUBANK' : 'S_PSUBANK',
+  '^CNXMEDIA'   : 'S_MEDIA',
+  '^CNXINFRA'   : 'S_INFRA',
+  // Commodities (USD)
+  'GC=F' : 'XAU',
+  'SI=F' : 'XAG',
+  'CL=F' : 'WTI',
+  'BZ=F' : 'BRENT',
+  'NG=F' : 'NGUS',
+  'HG=F' : 'LMECU',
+  // Currency
+  'INR=X'    : 'USDINR',
+  'EURINR=X' : 'EURINR',
+  'GBPINR=X' : 'GBPINR',
+  'JPYINR=X' : 'JPYINR',
+  'DX-Y.NYB' : 'DXY',
+  // Crypto
+  'BTC-USD' : 'BTC',
+  'ETH-USD' : 'ETH',
+  // US yields
+  '^TNX' : 'B_US10',
+  '^FVX' : 'B_US5',
+  '^TYX' : 'B_US30',
+  // Global indices
+  '^DJI'      : 'G_DJI',
+  '^GSPC'     : 'G_SPX',
+  '^IXIC'     : 'G_IXIC',
+  '^RUT'      : 'G_RUT',
+  '^GSPTSE'   : 'G_GSPTSE',
+  '^BVSP'     : 'G_BVSP',
+  '^FTSE'     : 'G_UKX',
+  '^GDAXI'    : 'G_DAX',
+  '^FCHI'     : 'G_CAC',
+  '^STOXX50E' : 'G_SX5E',
+  '^SSMI'     : 'G_SMI',
+  '^N225'     : 'G_N225',
+  '^HSI'      : 'G_HSI',
+  '000001.SS' : 'G_SHCOMP',
+  '^KS11'     : 'G_KOSPI',
+  '^TWII'     : 'G_TWII',
+  '^STI'      : 'G_STI',
+  '^AXJO'     : 'G_AXJO',
+  '^JKSE'     : 'G_JKSE'
 };
 
+/* NSE stocks — dashboard uses E_SYMBOL */
+const STOCKS = ['RELIANCE','TCS','HDFCBANK','ICICIBANK','INFY','BHARTIARTL','SBIN','ITC',
+'LT','HINDUNILVR','KOTAKBANK','AXISBANK','MARUTI','SUNPHARMA','TATAMOTORS','TITAN',
+'ULTRACEMCO','BAJFINANCE','NTPC','POWERGRID','ONGC','TATASTEEL','JSWSTEEL','HINDALCO',
+'WIPRO','HCLTECH','ADANIENT','ADANIPORTS','COALINDIA','ASIANPAINT','NESTLEIND','DMART',
+'TRENT','BEL','HAL','IRFC','VBL','PERSISTENT','CDSL','POLYCAB','MAZDOCK','SUZLON',
+'IREDA','YESBANK','PNB','IDFCFIRSTB','JIOFIN','LICI','DIXON','ZOMATO'];
+STOCKS.forEach(s => { MAP[s + '.NS'] = 'E_' + s; });
+
+/* ---------- helpers ---------- */
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
            '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
-function ok(name, n)   { out.sources[name] = 'ok:' + n;  console.log('  OK   ' + name + '  (' + n + ' items)'); }
-function bad(name, e)  { out.sources[name] = 'fail';     console.log('  FAIL ' + name + '  -> ' + e); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function withTimeout(url, opts = {}, ms = 20000) {
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), ms);
-  try { return await fetch(url, { ...opts, signal: ctl.signal }); }
-  finally { clearTimeout(t); }
-}
-
-/* ---------------- 1. NSE (may be geo-blocked) ---------------- */
-
-const NSE_H = {
-  'User-Agent': UA,
-  'Accept': 'application/json, text/plain, */*',
-  'Accept-Language': 'en-US,en;q=0.9',
-  'Referer': 'https://www.nseindia.com/'
-};
-
-let nseCookie = '';
-
-async function nseWarmup() {
-  const r = await withTimeout('https://www.nseindia.com/', { headers: NSE_H });
-  const jar = typeof r.headers.getSetCookie === 'function' ? r.headers.getSetCookie() : [];
-  nseCookie = jar.map(c => c.split(';')[0]).join('; ');
-  if (!nseCookie) throw new Error('no cookie returned');
-}
-
-async function nseGet(p) {
-  if (!nseCookie) await nseWarmup();
-  const r = await withTimeout('https://www.nseindia.com' + p,
-                              { headers: { ...NSE_H, Cookie: nseCookie } });
+async function yahoo(sym) {
+  const url = 'https://query1.finance.yahoo.com/v8/finance/chart/' +
+              encodeURIComponent(sym) + '?interval=1d&range=5d';
+  const r = await fetch(url, { headers: { 'User-Agent': UA } });
   if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.json();
+  const j = await r.json();
+  const m = j?.chart?.result?.[0]?.meta;
+  if (!m || m.regularMarketPrice == null) throw new Error('no price');
+  const px   = m.regularMarketPrice;
+  const prev = m.chartPreviousClose ?? m.previousClose ?? px;
+  return { p: +px.toFixed(4), pc: +prev.toFixed(4),
+           c: +(((px / prev) - 1) * 100).toFixed(2) };
 }
 
-async function pullNSE() {
+/* run in small batches so we stay polite */
+async function batch(symbols, size = 6) {
+  const out = {};
+  let ok = 0, fail = 0;
+  for (let i = 0; i < symbols.length; i += size) {
+    const slice = symbols.slice(i, i + size);
+    await Promise.all(slice.map(async sym => {
+      try {
+        out[MAP[sym]] = await yahoo(sym);
+        ok++;
+      } catch (e) {
+        fail++;
+        console.log('   skip ' + sym + ' (' + e.message + ')');
+      }
+    }));
+    await sleep(250);
+  }
+  console.log('   yahoo: ' + ok + ' ok, ' + fail + ' skipped');
+  return out;
+}
+
+/* ---------- optional: try NSE directly (usually blocked) ---------- */
+async function tryNSE(q) {
   try {
-    const j = await nseGet('/api/allIndices');
+    const H = { 'User-Agent': UA, 'Accept': 'application/json',
+                'Referer': 'https://www.nseindia.com/' };
+    const home = await fetch('https://www.nseindia.com/', { headers: H });
+    const jar = (home.headers.getSetCookie?.() || [])
+                  .map(c => c.split(';')[0]).join('; ');
+    const r = await fetch('https://www.nseindia.com/api/allIndices',
+                          { headers: { ...H, Cookie: jar } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    const NSEMAP = {
+      'NIFTY 50':'NIFTY50', 'NIFTY BANK':'BANKNIFTY',
+      'NIFTY FINANCIAL SERVICES':'FINNIFTY', 'NIFTY MIDCAP 100':'MIDCAP',
+      'NIFTY SMALLCAP 100':'SMALLCAP', 'NIFTY NEXT 50':'NEXT50',
+      'INDIA VIX':'VIX'
+    };
     let n = 0;
     (j.data || []).forEach(d => {
-      out.indices[(d.index || '').trim().toUpperCase()] = {
-        last: +d.last, pct: +d.percentChange, prev: +d.previousClose
-      };
-      n++;
-    });
-    ok('nse-indices', n);
-  } catch (e) { bad('nse-indices', e.message); }
-
-  for (const list of ['NIFTY 50', 'NIFTY NEXT 50']) {
-    try {
-      const j = await nseGet('/api/equity-stockIndices?index=' + encodeURIComponent(list));
-      let n = 0;
-      (j.data || []).forEach(d => {
-        if (!d.symbol || d.symbol.startsWith('NIFTY')) return;
-        out.stocks[d.symbol] = { last: +d.lastPrice, pct: +d.pChange, prev: +d.previousClose };
+      const id = NSEMAP[(d.index || '').trim().toUpperCase()];
+      if (id && d.last) {
+        q[id] = { p: +d.last, pc: +d.previousClose, c: +d.percentChange };
         n++;
-      });
-      ok('nse-' + list.replace(/ /g, ''), n);
-    } catch (e) { bad('nse-' + list.replace(/ /g, ''), e.message); }
-    await new Promise(r => setTimeout(r, 1200));
+      }
+    });
+    console.log('   nse: ' + n + ' indices (direct hit worked!)');
+  } catch (e) {
+    console.log('   nse: unavailable from this runner (' + e.message + ') — expected');
   }
 }
 
-/* ---------------- 2. Stooq — indices & commodities ---------------- */
-
-const STOOQ = {
-  '^nsei':  'NIFTY50',   '^bsesn': 'SENSEX',
-  '^spx':   'G_SPX',     '^dji':   'G_DJI',    '^ndq': 'G_IXIC',
-  '^nkx':   'G_N225',    '^hsi':   'G_HSI',    '^ftm': 'G_UKX',
-  '^dax':   'G_DAX',     '^shc':   'G_SHCOMP',
-  'gc.f':   'XAU',       'si.f':   'XAG',
-  'cl.f':   'WTI',       'ng.f':   'NGUS',     'hg.f': 'LMECU',
-  'usdinr': 'USDINR',    'eurinr': 'EURINR',   'gbpinr': 'GBPINR'
-};
-
-async function pullStooq() {
-  const syms = Object.keys(STOOQ);
-  let n = 0;
-  try {
-    const url = 'https://stooq.com/q/l/?s=' + syms.join('+') +
-                '&f=sd2t2ohlcp&h&e=csv';
-    const r = await withTimeout(url, { headers: { 'User-Agent': UA } });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const rows = (await r.text()).trim().split('\n').slice(1);
-    rows.forEach(line => {
-      const c = line.split(',');
-      const sym = (c[0] || '').toLowerCase();
-      const open = parseFloat(c[3]);
-      const close = parseFloat(c[6]);
-      const id = STOOQ[sym];
-      if (!id || !isFinite(close)) return;
-      out.quotes[id] = {
-        last: close,
-        pct: isFinite(open) && open ? (close / open - 1) * 100 : 0,
-        prev: isFinite(open) ? open : close
-      };
-      n++;
-    });
-    ok('stooq', n);
-  } catch (e) { bad('stooq', e.message); }
+/* ---------- derive MCX-style rupee bullion from spot ---------- */
+function deriveBullion(q) {
+  const usdinr = q.USDINR?.p, xau = q.XAU, xag = q.XAG;
+  if (!usdinr) return;
+  if (xau) {
+    const p = (xau.p * usdinr / 31.1035) * 10;
+    const pc = (xau.pc * usdinr / 31.1035) * 10;
+    q.M_GOLD  = { p: +p.toFixed(0), pc: +pc.toFixed(0), c: xau.c, derived: 1 };
+    q.M_GOLDM = { p: +p.toFixed(0), pc: +pc.toFixed(0), c: xau.c, derived: 1 };
+  }
+  if (xag) {
+    const p = (xag.p * usdinr / 31.1035) * 1000;
+    const pc = (xag.pc * usdinr / 31.1035) * 1000;
+    q.M_SILVER  = { p: +p.toFixed(0), pc: +pc.toFixed(0), c: xag.c, derived: 1 };
+    q.M_SILVERM = { p: +p.toFixed(0), pc: +pc.toFixed(0), c: xag.c, derived: 1 };
+  }
+  if (q.WTI) {
+    const p = q.WTI.p * usdinr;
+    q.M_CRUDE = { p: +p.toFixed(0), pc: +(q.WTI.pc * usdinr).toFixed(0),
+                  c: q.WTI.c, derived: 1 };
+  }
 }
 
-/* ---------------- 3. Crypto ---------------- */
-
-async function pullCrypto() {
-  try {
-    const r = await withTimeout(
-      'https://api.coingecko.com/api/v3/simple/price' +
-      '?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true',
-      { headers: { 'User-Agent': UA } });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const j = await r.json();
-    if (j.bitcoin)  out.quotes.BTC = { last: j.bitcoin.usd,  pct: j.bitcoin.usd_24h_change  || 0 };
-    if (j.ethereum) out.quotes.ETH = { last: j.ethereum.usd, pct: j.ethereum.usd_24h_change || 0 };
-    ok('crypto', 2);
-  } catch (e) { bad('crypto', e.message); }
-}
-
-/* ---------------- 4. Currencies ---------------- */
-
-async function pullFX() {
-  try {
-    const r = await withTimeout('https://api.frankfurter.app/latest?from=USD&to=INR,EUR,GBP,JPY');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const j = await r.json();
-    const usdinr = j.rates && j.rates.INR;
-    if (usdinr) {
-      if (!out.quotes.USDINR) out.quotes.USDINR = { last: usdinr, pct: 0 };
-      if (j.rates.EUR) out.quotes.EURINR = { last: usdinr / j.rates.EUR, pct: 0 };
-      if (j.rates.GBP) out.quotes.GBPINR = { last: usdinr / j.rates.GBP, pct: 0 };
-      if (j.rates.JPY) out.quotes.JPYINR = { last: (usdinr / j.rates.JPY) * 100, pct: 0 };
-    }
-    ok('fx', 4);
-  } catch (e) { bad('fx', e.message); }
-}
-
-/* ---------------- 5. Mutual fund NAVs ---------------- */
-
+/* ---------- mutual fund NAVs (mfapi.in — always works) ---------- */
 const FUNDS = {
-  '122639': 'Parag Parikh Flexi Cap',
-  '118825': 'Nippon India Small Cap',
-  '118989': 'HDFC Mid-Cap Opportunities',
-  '120465': 'ICICI Pru Bluechip',
-  '119775': 'Quant Small Cap',
-  '125497': 'Motilal Oswal Midcap',
-  '118533': 'SBI Contra Fund',
-  '120716': 'Mirae Asset Large Cap',
-  '119063': 'HDFC Flexi Cap',
-  '120847': 'Axis Small Cap'
+  '122639':'Parag Parikh Flexi Cap',
+  '118989':'HDFC Mid-Cap Opportunities',
+  '113177':'Nippon India Small Cap',
+  '120465':'ICICI Pru Bluechip',
+  '119598':'SBI Contra Fund',
+  '120716':'Quant Small Cap',
+  '118834':'Mirae Asset Large Cap',
+  '125497':'UTI Nifty 50 Index'
 };
-
-async function pullFunds() {
-  let n = 0;
-  for (const [code, name] of Object.entries(FUNDS)) {
+async function funds() {
+  const out = {};
+  for (const code of Object.keys(FUNDS)) {
     try {
-      const r = await withTimeout('https://api.mfapi.in/mf/' + code);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const r = await fetch('https://api.mfapi.in/mf/' + code);
       const j = await r.json();
       const d = j.data || [];
-      if (!d.length) continue;
-      const nav  = parseFloat(d[0].nav);
-      const prev = parseFloat((d[1] || d[0]).nav);
-      out.funds[code] = {
-        name: (j.meta && j.meta.scheme_name) || name,
-        nav, date: d[0].date,
-        pct: prev ? (nav / prev - 1) * 100 : 0,
-        history: d.slice(0, 400).map(x => [x.date, parseFloat(x.nav)])
-      };
-      n++;
-    } catch (e) { /* skip this fund */ }
-    await new Promise(r => setTimeout(r, 250));
+      if (d.length > 1) {
+        const nav = +d[0].nav, prev = +d[1].nav;
+        out[code] = { name: j.meta?.scheme_name || FUNDS[code],
+                      nav, date: d[0].date,
+                      c: +(((nav / prev) - 1) * 100).toFixed(2) };
+      }
+    } catch (e) { console.log('   fund skip ' + code); }
+    await sleep(120);
   }
-  n ? ok('mutual-funds', n) : bad('mutual-funds', 'all failed');
+  console.log('   funds: ' + Object.keys(out).length + ' NAVs');
+  return out;
 }
 
-/* ---------------- run ---------------- */
-
+/* ---------- main ---------- */
 (async () => {
-  console.log('--- FinDeck collector ---');
-  await pullNSE();
-  await pullStooq();
-  await pullCrypto();
-  await pullFX();
-  await pullFunds();
+  console.log('FinDeck fetch starting…');
+  const quotes = await batch(Object.keys(MAP));
+  await tryNSE(quotes);
+  deriveBullion(quotes);
+  const mf = await funds();
 
-  fs.writeFileSync(path.join(OUT_DIR, 'market.json'), JSON.stringify(out));
+  const now = new Date();
+  const payload = {
+    updated: now.toISOString(),
+    updatedIST: now.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata',
+                  dateStyle: 'medium', timeStyle: 'medium' }),
+    source: 'Yahoo Finance (delayed) + mfapi.in' +
+            (quotes.NIFTY50?.p && quotes.NEXT50 ? ' + NSE' : ''),
+    count: Object.keys(quotes).length,
+    quotes,
+    funds: mf
+  };
 
-  console.log('--- summary ---');
-  Object.entries(out.sources).forEach(([k, v]) => console.log('  ' + k + ': ' + v));
-  console.log('indices=' + Object.keys(out.indices).length +
-              ' stocks=' + Object.keys(out.stocks).length +
-              ' quotes=' + Object.keys(out.quotes).length +
-              ' funds=' + Object.keys(out.funds).length);
+  // skip the commit entirely if nothing actually moved
+  try {
+    const old = JSON.parse(fs.readFileSync(OUT, 'utf8'));
+    if (JSON.stringify(old.quotes) === JSON.stringify(quotes) &&
+        JSON.stringify(old.funds)  === JSON.stringify(mf)) {
+      console.log('No change since last run — nothing written.');
+      return;
+    }
+  } catch (e) { /* first run, file missing or invalid */ }
+
+  fs.mkdirSync(path.dirname(OUT), { recursive: true });
+  fs.writeFileSync(OUT, JSON.stringify(payload, null, 1));
+  console.log('Wrote ' + payload.count + ' quotes at ' + payload.updatedIST);
 })();
