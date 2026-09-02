@@ -1889,5 +1889,88 @@ setTimeout(()=>{paint();},120);
 SIM.timer=setInterval(()=>{if(SIM.on)step();},2200);
 window.addEventListener('resize',()=>{paint();});
 </script>
+
+  <script>
+/* ==========================================================
+   FinDeck — read data/market.json (GitHub Pages mode)
+   ========================================================== */
+(function(){
+
+  const FILE = 'data/market.json';
+  const EVERY = 60000;               // re-read once a minute
+  let stamp = '';
+
+  function badge(txt, colour){
+    const b = document.getElementById('liveBtn');
+    if(!b) return;
+    b.textContent = txt;
+    b.style.background = colour;
+    b.style.borderColor = colour;
+    b.style.color = '#fff';
+    b.style.fontSize = '11px';
+  }
+
+  function apply(id, q){
+    const i = INST[id];
+    if(!i || !q || !isFinite(q.p)) return false;
+    i.px   = q.p;
+    i.prev = isFinite(q.pc) ? q.pc : q.p;
+    i.chg  = isFinite(q.c) ? q.c : 0;
+    i.hist.push(q.p);
+    if(i.hist.length > 60) i.hist.shift();
+    return true;
+  }
+
+  async function load(){
+    try{
+      const r = await fetch(FILE + '?t=' + Date.now(), { cache: 'no-store' });
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+
+      if(!d.quotes || !Object.keys(d.quotes).length){
+        badge('◐ AWAITING DATA', '#f0b90b');
+        return;
+      }
+
+      if(d.updated === stamp){ return; }      // unchanged, skip repaint
+      stamp = d.updated;
+
+      let n = 0;
+      for(const id in d.quotes){ if(apply(id, d.quotes[id])) n++; }
+      paint();
+
+      const age = Math.round((Date.now() - new Date(d.updated)) / 60000);
+      badge('● DATA ' + (age < 1 ? 'JUST NOW' : age + 'm AGO'),
+            age > 45 ? '#fb923c' : '#16c784');
+
+      const st = document.getElementById('mktStatus');
+      if(st && !document.getElementById('srcChip')){
+        const c = document.createElement('div');
+        c.className = 'chip'; c.id = 'srcChip';
+        st.appendChild(c);
+      }
+      const chip = document.getElementById('srcChip');
+      if(chip) chip.innerHTML =
+        '<span class="led on"></span><b>' + n + ' live</b>' +
+        '<span style="color:var(--mut)">' + d.updatedIST + '</span>';
+
+      console.log('FinDeck: loaded ' + n + ' quotes · ' + d.updatedIST);
+
+    }catch(e){
+      badge('⚠ DATA UNAVAILABLE', '#ea3943');
+      console.warn('FinDeck load failed:', e.message);
+    }
+  }
+
+  clearInterval(SIM.timer);     // stop the fake price generator
+  SIM.on = false;
+  load();
+  setInterval(load, EVERY);
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible') load();
+  });
+
+})();
+</script>
 </body>
 </html>
