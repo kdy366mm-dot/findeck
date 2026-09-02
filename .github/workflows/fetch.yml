@@ -1,43 +1,50 @@
-name: Fetch market data
+name: Market stream
 
 on:
   schedule:
-    # every 5 min, 08:30–16:25 IST, Mon–Fri  (cron is UTC; IST = UTC+5:30)
-    - cron: '*/5 3-10 * * 1-5'
-    # a couple of evening runs to catch US close
-    - cron: '0 17,21 * * 1-5'
-  workflow_dispatch:        # lets you run it by hand from the Actions tab
+    - cron: '20 3 * * 1-5'    # 08:50 IST — primary start
+    - cron: '00 8 * * 1-5'    # 13:30 IST — self-heal if the first died
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: fetch
+  group: stream
   cancel-in-progress: false
 
 jobs:
-  fetch:
+  stream:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Fetch data
-        run: node scripts/fetch.js
-
-      - name: Commit if changed
+      - name: Stream until market close
         run: |
           git config user.name  "findeck-bot"
           git config user.email "actions@github.com"
-          git add data/market.json
-          if git diff --staged --quiet; then
-            echo "nothing to commit"
-          else
-            git commit -m "data: update $(date -u +'%Y-%m-%d %H:%M UTC') [skip ci]"
-            git pull --rebase --autostash || true
-            git push
-          fi
+
+          HARD=$(( $(date +%s) + 350*60 ))
+          CLOSE=$(date -u -d "$(date -u +%F) 10:15" +%s)   # 15:45 IST
+          END=$(( HARD < CLOSE ? HARD : CLOSE ))
+
+          echo "streaming until $(date -u -d @$END)"
+          N=0
+          while [ $(date +%s) -lt $END ]; do
+            node scripts/fetch.js || echo "fetch failed, continuing"
+            git add data/market.json
+            if ! git diff --staged --quiet; then
+              N=$((N+1))
+              git commit -q -m "data $N [skip ci]"
+              git push -q 2>/dev/null || {
+                git pull --rebase --autostash -q
+                git push -q
+              }
+            fi
+            sleep 120
+          done
+          echo "done — $N updates pushed"
