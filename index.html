@@ -1,0 +1,1893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinDeck — Personal Investment Command Center</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0a0e16; --panel:#111826; --panel2:#161f31; --bd:#22304a; --bd2:#2c3d5c;
+  --txt:#e8eefb; --mut:#8497b5; --grn:#16c784; --red:#ea3943; --acc:#4f8cff;
+  --gold:#f0b90b; --pur:#a78bfa; --cy:#22d3ee; --or:#fb923c;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:14px/1.5 'Segoe UI',Roboto,system-ui,sans-serif;overflow-x:hidden}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:5px}
+::-webkit-scrollbar-track{background:var(--panel)}
+a{color:var(--acc);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ---------- TOP BAR ---------- */
+.topbar{position:sticky;top:0;z-index:100;background:linear-gradient(180deg,#0d1422,#0a0e16);
+  border-bottom:1px solid var(--bd);padding:10px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.logo{font-size:19px;font-weight:800;letter-spacing:-.5px;display:flex;align-items:center;gap:8px}
+.logo span{background:linear-gradient(90deg,var(--acc),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo .dot{width:9px;height:9px;border-radius:50%;background:var(--grn);box-shadow:0 0 10px var(--grn);animation:pulse 1.8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.mkt-status{display:flex;gap:10px;flex-wrap:wrap}
+.chip{background:var(--panel2);border:1px solid var(--bd);border-radius:20px;padding:4px 11px;font-size:11.5px;
+  display:flex;align-items:center;gap:6px;white-space:nowrap}
+.chip b{font-weight:600}
+.led{width:7px;height:7px;border-radius:50%}
+.led.on{background:var(--grn);box-shadow:0 0 7px var(--grn)}
+.led.off{background:var(--red)}
+.led.pre{background:var(--or);box-shadow:0 0 7px var(--or)}
+.spacer{flex:1}
+.search{background:var(--panel2);border:1px solid var(--bd);border-radius:8px;padding:7px 12px;color:var(--txt);width:230px;font-size:13px}
+.search:focus{outline:none;border-color:var(--acc)}
+.btn{background:var(--panel2);border:1px solid var(--bd);border-radius:8px;padding:7px 13px;color:var(--txt);
+  cursor:pointer;font-size:12.5px;transition:.15s;white-space:nowrap}
+.btn:hover{border-color:var(--acc);background:#1c2942}
+.btn.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.clock{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:var(--mut)}
+
+/* ---------- TICKER ---------- */
+.tickerwrap{background:#0d1422;border-bottom:1px solid var(--bd);overflow:hidden;position:sticky;top:53px;z-index:99;height:34px}
+.ticker{display:flex;gap:26px;align-items:center;height:34px;white-space:nowrap;animation:scroll 70s linear infinite;padding-left:12px}
+.tickerwrap:hover .ticker{animation-play-state:paused}
+@keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.tk{display:flex;gap:7px;font-size:12.5px;align-items:center}
+.tk .n{color:var(--mut);font-weight:600}
+
+/* ---------- LAYOUT ---------- */
+.shell{display:flex;min-height:calc(100vh - 87px)}
+.side{width:212px;background:#0d1422;border-right:1px solid var(--bd);padding:14px 0;position:sticky;top:87px;
+  height:calc(100vh - 87px);overflow-y:auto;flex-shrink:0}
+.side .grp{color:var(--mut);font-size:10px;letter-spacing:1.4px;text-transform:uppercase;padding:14px 18px 6px;font-weight:700}
+.nav{display:flex;align-items:center;gap:10px;padding:9px 18px;cursor:pointer;font-size:13.3px;
+  border-left:3px solid transparent;transition:.13s;color:#c3d0e4}
+.nav:hover{background:#141d2e;color:#fff}
+.nav.on{background:linear-gradient(90deg,rgba(79,140,255,.18),transparent);border-left-color:var(--acc);color:#fff;font-weight:600}
+.nav i{width:17px;text-align:center;font-style:normal;font-size:14px}
+.main{flex:1;padding:18px 22px 60px;min-width:0}
+.sec{display:none;animation:fade .25s}
+.sec.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---------- PANELS ---------- */
+h1{font-size:22px;margin-bottom:3px;font-weight:700}
+.sub{color:var(--mut);font-size:12.5px;margin-bottom:16px}
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:11px;padding:15px;margin-bottom:16px}
+.card h3{font-size:14px;margin-bottom:12px;display:flex;align-items:center;gap:9px;font-weight:650}
+.card h3 .tag{font-size:9.5px;background:var(--panel2);border:1px solid var(--bd2);color:var(--mut);
+  padding:2px 7px;border-radius:5px;font-weight:600;letter-spacing:.5px}
+.card h3 .tag.src{border-color:#2f4a2f;color:#7dd88a;background:#12211a}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g5{grid-template-columns:repeat(5,1fr)}
+.g6{grid-template-columns:repeat(6,1fr)}
+@media(max-width:1400px){.g6{grid-template-columns:repeat(4,1fr)}.g5{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1100px){.g4,.g3{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}}
+@media(max-width:760px){.side{display:none}.g4,.g3,.g2,.g5,.g6{grid-template-columns:1fr}}
+
+/* ---------- QUOTE TILES ---------- */
+.tile{background:var(--panel);border:1px solid var(--bd);border-radius:11px;padding:13px;position:relative;overflow:hidden;transition:.15s}
+.tile:hover{border-color:var(--bd2);transform:translateY(-2px)}
+.tile .nm{font-size:11.5px;color:var(--mut);font-weight:600;letter-spacing:.3px;margin-bottom:5px;
+  display:flex;justify-content:space-between;align-items:center}
+.tile .px{font-size:19px;font-weight:700;font-family:ui-monospace,Menlo,monospace}
+.tile .ch{font-size:12px;font-weight:600;margin-top:2px}
+.tile canvas{margin-top:8px;display:block}
+.up{color:var(--grn)}.dn{color:var(--red)}.fl{color:var(--mut)}
+.flash-u{animation:fu .6s}.flash-d{animation:fd .6s}
+@keyframes fu{0%{background:rgba(22,199,132,.22)}100%{background:transparent}}
+@keyframes fd{0%{background:rgba(234,57,67,.22)}100%{background:transparent}}
+.pill{font-size:9.5px;padding:1.5px 6px;border-radius:4px;font-weight:700;letter-spacing:.4px}
+.pill.g{background:rgba(22,199,132,.15);color:var(--grn)}
+.pill.r{background:rgba(234,57,67,.15);color:var(--red)}
+.pill.b{background:rgba(79,140,255,.15);color:var(--acc)}
+.pill.y{background:rgba(240,185,11,.15);color:var(--gold)}
+.pill.p{background:rgba(167,139,250,.15);color:var(--pur)}
+.pill.o{background:rgba(251,146,60,.15);color:var(--or)}
+.pill.m{background:var(--panel2);color:var(--mut);border:1px solid var(--bd)}
+
+/* ---------- TABLES ---------- */
+.tblwrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12.8px}
+th{text-align:left;color:var(--mut);font-size:10.5px;text-transform:uppercase;letter-spacing:.7px;
+  padding:8px 10px;border-bottom:1px solid var(--bd);font-weight:700;white-space:nowrap;position:sticky;top:0;background:var(--panel)}
+td{padding:8px 10px;border-bottom:1px solid rgba(34,48,74,.5);white-space:nowrap}
+tbody tr:hover{background:#141d2e}
+td.num,th.num{text-align:right;font-family:ui-monospace,Menlo,monospace}
+.sym{font-weight:650}
+.tiny{font-size:11px;color:var(--mut)}
+
+/* ---------- TABS ---------- */
+.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;border-bottom:1px solid var(--bd);padding-bottom:0}
+.tab{padding:7px 14px;font-size:12.5px;cursor:pointer;color:var(--mut);border-bottom:2px solid transparent;transition:.13s;font-weight:600}
+.tab:hover{color:var(--txt)}
+.tab.on{color:var(--acc);border-bottom-color:var(--acc)}
+.tabpane{display:none}.tabpane.on{display:block}
+
+/* ---------- HEATMAP ---------- */
+.heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:7px}
+.hcell{padding:11px 9px;border-radius:8px;text-align:center;font-size:11.5px;font-weight:600;cursor:default;transition:.15s}
+.hcell:hover{transform:scale(1.05)}
+.hcell .hv{font-size:14px;font-weight:800;margin-top:3px;font-family:ui-monospace,monospace}
+
+/* ---------- NEWS ---------- */
+.news{display:flex;gap:12px;padding:12px;border-bottom:1px solid rgba(34,48,74,.6);transition:.13s;cursor:pointer}
+.news:hover{background:#141d2e}
+.news .bar{width:3px;border-radius:3px;flex-shrink:0}
+.news .ttl{font-size:13.3px;font-weight:600;margin-bottom:4px;line-height:1.4}
+.news .meta{font-size:11px;color:var(--mut);display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.news .src{color:var(--acc);font-weight:600}
+
+/* ---------- PROGRESS ---------- */
+.bar-out{height:7px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-top:5px}
+.bar-in{height:100%;border-radius:4px;transition:width .5s}
+
+/* ---------- CALENDAR ---------- */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.cal .dh{text-align:center;font-size:10px;color:var(--mut);font-weight:700;padding:5px;letter-spacing:.6px}
+.day{background:var(--panel2);border:1px solid var(--bd);border-radius:7px;min-height:76px;padding:6px;font-size:11px;cursor:pointer;transition:.13s}
+.day:hover{border-color:var(--acc)}
+.day.empty{background:transparent;border-color:transparent;cursor:default}
+.day.today{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.day .dn{font-weight:700;font-size:12px;margin-bottom:3px}
+.ev{font-size:9.3px;padding:1.5px 4px;border-radius:3px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- IPO ---------- */
+.ipo{background:var(--panel2);border:1px solid var(--bd);border-radius:10px;padding:14px;transition:.15s;cursor:pointer}
+.ipo:hover{border-color:var(--acc)}
+.ipo.sel{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.kv{display:flex;justify-content:space-between;font-size:11.8px;padding:3.5px 0;border-bottom:1px dashed rgba(34,48,74,.7)}
+.kv span:first-child{color:var(--mut)}
+.kv span:last-child{font-weight:650;font-family:ui-monospace,monospace}
+
+.banner{background:linear-gradient(90deg,rgba(240,185,11,.13),rgba(240,185,11,.02));border:1px solid rgba(240,185,11,.3);
+  border-radius:10px;padding:11px 15px;margin-bottom:16px;font-size:12.3px;display:flex;gap:11px;align-items:flex-start}
+.banner b{color:var(--gold)}
+code{background:#0a0e16;border:1px solid var(--bd);padding:1.5px 6px;border-radius:4px;font-size:11.5px;color:var(--cy);font-family:ui-monospace,monospace}
+pre{background:#080c14;border:1px solid var(--bd);border-radius:9px;padding:14px;overflow-x:auto;font-size:11.7px;
+  line-height:1.65;color:#a8c5e8;font-family:ui-monospace,Menlo,monospace}
+.chartbox{position:relative;height:260px}
+.chartbox.sm{height:190px}
+.chartbox.lg{height:320px}
+.rowflex{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.stat{flex:1;min-width:110px}
+.stat .l{font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;font-weight:600}
+.stat .v{font-size:17px;font-weight:700;font-family:ui-monospace,monospace;margin-top:2px}
+.dis{font-size:11px;color:var(--mut);border-top:1px solid var(--bd);padding-top:11px;margin-top:6px}
+</style>
+</head>
+<body>
+
+<!-- ================= TOP BAR ================= -->
+<div class="topbar">
+  <div class="logo"><span class="dot"></span><span>FinDeck</span></div>
+  <div class="mkt-status" id="mktStatus"></div>
+  <div class="spacer"></div>
+  <input class="search" id="gsearch" placeholder="Filter this section…">
+  <button class="btn on" id="liveBtn">● LIVE SIM</button>
+  <div class="clock" id="clock"></div>
+</div>
+
+<!-- ================= TICKER ================= -->
+<div class="tickerwrap"><div class="ticker" id="ticker"></div></div>
+
+<div class="shell">
+<!-- ================= SIDEBAR ================= -->
+<div class="side">
+  <div class="grp">Dashboard</div>
+  <div class="nav on" data-s="overview"><i>◈</i>Market Overview</div>
+  <div class="grp">Markets</div>
+  <div class="nav" data-s="equity"><i>▤</i>Equities · NSE/BSE</div>
+  <div class="nav" data-s="global"><i>◍</i>Global Markets</div>
+  <div class="nav" data-s="comm"><i>⛏</i>Commodities · MCX</div>
+  <div class="nav" data-s="gold"><i>◆</i>Gold &amp; Silver</div>
+  <div class="nav" data-s="bonds"><i>≡</i>Bonds &amp; Yields</div>
+  <div class="nav" data-s="mf"><i>◫</i>Mutual Funds</div>
+  <div class="nav" data-s="fx"><i>⇄</i>Currency &amp; Crypto</div>
+  <div class="grp">Primary Market</div>
+  <div class="nav" data-s="ipo"><i>★</i>IPO Center &amp; GMP</div>
+  <div class="grp">Intelligence</div>
+  <div class="nav" data-s="cal"><i>▦</i>Events Calendar</div>
+  <div class="nav" data-s="filings"><i>◱</i>Corporate Filings</div>
+  <div class="nav" data-s="news"><i>◲</i>News Terminal</div>
+  <div class="grp">Tools</div>
+  <div class="nav" data-s="tools"><i>∑</i>Calculators</div>
+  <div class="nav" data-s="feeds"><i>⚙</i>Data Sources / API</div>
+</div>
+
+<div class="main">
+
+<!-- =========================================================
+     1. MARKET OVERVIEW
+========================================================= -->
+<div class="sec on" id="s-overview">
+  <h1>Market Overview</h1>
+  <div class="sub">Cross-asset snapshot · Indian &amp; global markets · auto-refreshing</div>
+
+  <div class="banner">
+    <span style="font-size:16px">⚠</span>
+    <div><b>Demo data mode.</b> All prices/returns below are <b>simulated placeholders</b> so you can see the full UI and live-fluctuation behaviour immediately. Open <b>⚙ Data Sources / API</b> in the sidebar for the exact official NSE / BSE / MCX / AMFI / RBI endpoints and a 20-line proxy script to make every number genuinely live.</div>
+  </div>
+
+  <div class="card">
+    <h3>Indian Indices <span class="tag">NSE + BSE</span><span class="tag">SAMPLE</span></h3>
+    <div class="grid g5" id="idxTiles"></div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>NIFTY 50 — Intraday <span class="tag">1 min · simulated</span></h3>
+      <div class="chartbox"><canvas id="cIndex"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Asset Class Performance <span class="tag">CY Return %</span></h3>
+      <div class="chartbox"><canvas id="cAsset"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid g4">
+    <div class="card"><h3>Gold &amp; Silver <span class="tag">MCX</span></h3><div id="ovGold"></div></div>
+    <div class="card"><h3>Energy <span class="tag">MCX / ICE</span></h3><div id="ovEnergy"></div></div>
+    <div class="card"><h3>Benchmark Yields <span class="tag">10Y G-Sec</span></h3><div id="ovBond"></div></div>
+    <div class="card"><h3>Currency <span class="tag">Spot</span></h3><div id="ovFx"></div></div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>Sector Heatmap <span class="tag">NSE Sectoral Indices</span></h3>
+      <div class="heat" id="heatmap"></div>
+    </div>
+    <div class="card">
+      <h3>Institutional Flows <span class="tag src">NSE / SEBI provisional</span></h3>
+      <div class="tblwrap"><table id="tFlows"></table></div>
+      <div class="dis">FII/DII cash-market provisional figures are published by NSE at ~18:00 IST and finalised by SEBI next morning.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Top Headlines <span class="tag">All categories</span></h3>
+    <div id="ovNews"></div>
+  </div>
+</div>
+
+<!-- =========================================================
+     2. EQUITIES
+========================================================= -->
+<div class="sec" id="s-equity">
+  <h1>Equities — NSE &amp; BSE</h1>
+  <div class="sub">Broad + sectoral indices, movers, breadth, delivery data and market internals</div>
+
+  <div class="grid g6" id="eqIdx"></div>
+
+  <div class="tabs" data-tabs="eq">
+    <div class="tab on" data-t="movers">Top Movers</div>
+    <div class="tab" data-t="active">Most Active</div>
+    <div class="tab" data-t="hilo">52-Week High/Low</div>
+    <div class="tab" data-t="breadth">Breadth &amp; Internals</div>
+    <div class="tab" data-t="bulk">Bulk / Block Deals</div>
+  </div>
+
+  <div class="tabpane on" id="eq-movers">
+    <div class="grid g2">
+      <div class="card"><h3><span class="pill g">GAINERS</span> NIFTY 500 <span class="tag">SAMPLE</span></h3>
+        <div class="tblwrap"><table id="tGain"></table></div></div>
+      <div class="card"><h3><span class="pill r">LOSERS</span> NIFTY 500 <span class="tag">SAMPLE</span></h3>
+        <div class="tblwrap"><table id="tLose"></table></div></div>
+    </div>
+  </div>
+
+  <div class="tabpane" id="eq-active">
+    <div class="card"><h3>Most Active by Value &amp; Volume <span class="tag src">NSE equity-stockIndices</span></h3>
+      <div class="tblwrap"><table id="tActive"></table></div></div>
+  </div>
+
+  <div class="tabpane" id="eq-hilo">
+    <div class="grid g2">
+      <div class="card"><h3>52-Week Highs <span class="pill g">NEW</span></h3><div class="tblwrap"><table id="tHigh"></table></div></div>
+      <div class="card"><h3>52-Week Lows <span class="pill r">NEW</span></h3><div class="tblwrap"><table id="tLow"></table></div></div>
+    </div>
+  </div>
+
+  <div class="tabpane" id="eq-breadth">
+    <div class="grid g2">
+      <div class="card">
+        <h3>Market Breadth <span class="tag">NSE Cash</span></h3>
+        <div id="breadth"></div>
+      </div>
+      <div class="card">
+        <h3>Valuation Snapshot <span class="tag src">NSE daily P/E, P/B, Div-Yield</span></h3>
+        <div class="tblwrap"><table id="tVal"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabpane" id="eq-bulk">
+    <div class="card"><h3>Bulk &amp; Block Deals <span class="tag src">NSE / BSE daily reports</span></h3>
+      <div class="tblwrap"><table id="tBulk"></table></div>
+      <div class="dis">Source files: NSE <code>/api/historicalOR/bulk-block-short-deals</code> · BSE <code>Bulk_Deals</code> daily CSV.</div>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================
+     3. GLOBAL MARKETS
+========================================================= -->
+<div class="sec" id="s-global">
+  <h1>Global Markets</h1>
+  <div class="sub">World indices, regional performance and India's relative positioning</div>
+  <div class="card"><h3>World Indices <span class="tag">SAMPLE</span></h3>
+    <div class="tblwrap"><table id="tGlobal"></table></div></div>
+  <div class="grid g2">
+    <div class="card"><h3>Regional Performance <span class="tag">CY %</span></h3><div class="chartbox"><canvas id="cGlobal"></canvas></div></div>
+    <div class="card"><h3>ADR / India-linked Instruments</h3><div class="tblwrap"><table id="tAdr"></table></div></div>
+  </div>
+</div>
+
+<!-- =========================================================
+     4. COMMODITIES
+========================================================= -->
+<div class="sec" id="s-comm">
+  <h1>Commodities — MCX / NCDEX / Global</h1>
+  <div class="sub">Bullion, energy, base metals and agri futures with live-style ticks</div>
+
+  <div class="grid g4" id="commTiles"></div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>Normalised Performance <span class="tag">Rebased to 100</span></h3>
+      <div class="chartbox"><canvas id="cComm"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>MCX Futures Chain <span class="tag src">MCX market-watch</span></h3>
+      <div class="tblwrap"><table id="tMcx"></table></div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card"><h3>International Benchmarks <span class="tag">COMEX · NYMEX · ICE · LME</span></h3>
+      <div class="tblwrap"><table id="tIntl"></table></div></div>
+    <div class="card"><h3>Agri Complex <span class="tag src">NCDEX</span></h3>
+      <div class="tblwrap"><table id="tAgri"></table></div></div>
+  </div>
+</div>
+
+<!-- =========================================================
+     5. GOLD & SILVER
+========================================================= -->
+<div class="sec" id="s-gold">
+  <h1>Gold &amp; Silver Desk</h1>
+  <div class="sub">Physical rates, futures, ETFs, Sovereign Gold Bonds and the gold–silver ratio</div>
+
+  <div class="grid g4" id="goldTop"></div>
+
+  <div class="grid g2">
+    <div class="card"><h3>Gold vs Silver — 12 Month <span class="tag">₹ per 10g / kg</span></h3>
+      <div class="chartbox"><canvas id="cGold"></canvas></div></div>
+    <div class="card"><h3>City-wise Physical Rates <span class="tag src">IBJA / jeweller association</span></h3>
+      <div class="tblwrap"><table id="tCity"></table></div>
+      <div class="dis">Retail rates exclude 3% GST and making charges. IBJA publishes AM/PM benchmark rates twice daily.</div></div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card"><h3>Gold &amp; Silver ETFs <span class="tag src">NSE / AMFI NAV</span></h3>
+      <div class="tblwrap"><table id="tGetf"></table></div></div>
+    <div class="card"><h3>Sovereign Gold Bonds — Traded Series <span class="tag src">NSE SGB segment</span></h3>
+      <div class="tblwrap"><table id="tSgb"></table></div>
+      <div class="dis">SGBs pay 2.5% p.a. on issue price; capital gains on redemption at maturity are tax-exempt for individuals. Secondary-market SGBs often trade at a discount to spot gold.</div></div>
+  </div>
+</div>
+
+<!-- =========================================================
+     6. BONDS
+========================================================= -->
+<div class="sec" id="s-bonds">
+  <h1>Bond &amp; Fixed Income Markets</h1>
+  <div class="sub">Sovereign yields across countries, Indian G-Sec curve, corporate bonds, T-Bills and debt funds</div>
+
+  <div class="grid g5" id="bondTop"></div>
+
+  <div class="grid g2">
+    <div class="card"><h3>Yield Curves <span class="tag">India vs US</span></h3><div class="chartbox"><canvas id="cCurve"></canvas></div></div>
+    <div class="card"><h3>Global 10-Year Yields <span class="tag">%</span></h3><div class="chartbox"><canvas id="cY10"></canvas></div></div>
+  </div>
+
+  <div class="tabs" data-tabs="bd">
+    <div class="tab on" data-t="sov">Sovereign — Multi-Country</div>
+    <div class="tab" data-t="ind">India G-Sec &amp; T-Bills</div>
+    <div class="tab" data-t="corp">Corporate Bonds</div>
+    <div class="tab" data-t="dfund">Debt Funds &amp; Bond ETFs</div>
+  </div>
+  <div class="tabpane on" id="bd-sov"><div class="card"><h3>Sovereign Bond Board <span class="tag">SAMPLE</span></h3><div class="tblwrap"><table id="tSov"></table></div></div></div>
+  <div class="tabpane" id="bd-ind"><div class="card"><h3>Indian Government Securities <span class="tag src">RBI NDS-OM / CCIL</span></h3><div class="tblwrap"><table id="tGsec"></table></div>
+    <div class="dis">Retail investors can buy G-Secs/T-Bills commission-free via <b>RBI Retail Direct</b> or NSE goBID.</div></div></div>
+  <div class="tabpane" id="bd-corp"><div class="card"><h3>Corporate &amp; PSU Bonds <span class="tag src">NSE/BSE debt segment</span></h3><div class="tblwrap"><table id="tCorp"></table></div></div></div>
+  <div class="tabpane" id="bd-dfund"><div class="card"><h3>Debt Mutual Funds &amp; Bond ETFs <span class="tag src">AMFI</span></h3><div class="tblwrap"><table id="tDebtF"></table></div></div></div>
+</div>
+
+<!-- =========================================================
+     7. MUTUAL FUNDS
+========================================================= -->
+<div class="sec" id="s-mf">
+  <h1>Mutual Funds</h1>
+  <div class="sub">Category leaders, NAV movement, risk metrics and rolling returns</div>
+
+  <div class="grid g4" id="mfTop"></div>
+
+  <div class="tabs" data-tabs="mf">
+    <div class="tab on" data-t="all">Best Performing (All)</div>
+    <div class="tab" data-t="large">Large Cap</div>
+    <div class="tab" data-t="mid">Mid Cap</div>
+    <div class="tab" data-t="small">Small Cap</div>
+    <div class="tab" data-t="flexi">Flexi / Multi Cap</div>
+    <div class="tab" data-t="elss">ELSS (80C)</div>
+    <div class="tab" data-t="index">Index / ETF</div>
+    <div class="tab" data-t="hyb">Hybrid</div>
+  </div>
+  <div id="mfPanes"></div>
+
+  <div class="grid g2">
+    <div class="card"><h3>Top 3-Year CAGR Leaders <span class="tag">%</span></h3><div class="chartbox lg"><canvas id="cMF"></canvas></div></div>
+    <div class="card"><h3>Category Average Returns <span class="tag">CAGR %</span></h3><div class="chartbox lg"><canvas id="cMFCat"></canvas></div></div>
+  </div>
+
+  <div class="card">
+    <h3>Fund Screener Notes <span class="tag">Methodology</span></h3>
+    <div class="grid g3" style="font-size:12.3px;color:#c3d0e4">
+      <div><b style="color:var(--acc)">Return quality</b><br>Prefer consistent 3Y &amp; 5Y rolling returns over 1-year chart-toppers. A fund topping 1Y tables is often just riding one hot sector.</div>
+      <div><b style="color:var(--acc)">Cost</b><br>Direct plans save 0.6–1.2% expense ratio annually versus Regular — compounded over 20 years that's ~20% of the corpus.</div>
+      <div><b style="color:var(--acc)">Risk</b><br>Check Std-Dev, Sharpe, Sortino, max drawdown and downside capture, not just returns. High alpha with high beta is leverage, not skill.</div>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================
+     8. FX & CRYPTO
+========================================================= -->
+<div class="sec" id="s-fx">
+  <h1>Currency &amp; Digital Assets</h1>
+  <div class="sub">INR pairs, dollar index and major crypto benchmarks</div>
+  <div class="grid g4" id="fxTiles"></div>
+  <div class="grid g2">
+    <div class="card"><h3>Currency Board <span class="tag src">RBI reference rate</span></h3><div class="tblwrap"><table id="tFx"></table></div></div>
+    <div class="card"><h3>Crypto Board <span class="tag">Global spot</span></h3><div class="tblwrap"><table id="tCrypto"></table></div>
+      <div class="dis">In India, VDA gains are taxed at 30% + cess with 1% TDS on transfers; losses cannot be set off.</div></div>
+  </div>
+</div>
+
+<!-- =========================================================
+     9. IPO CENTER
+========================================================= -->
+<div class="sec" id="s-ipo">
+  <h1>IPO Center</h1>
+  <div class="sub">Open, upcoming and recently listed issues · Grey Market Premium · segment &amp; peer analysis</div>
+
+  <div class="grid g4" id="ipoStats"></div>
+
+  <div class="tabs" data-tabs="ipo">
+    <div class="tab on" data-t="open">🟢 Open Now</div>
+    <div class="tab" data-t="up">🔵 Upcoming</div>
+    <div class="tab" data-t="listed">⚪ Recently Listed</div>
+    <div class="tab" data-t="sme">🟡 SME IPOs</div>
+  </div>
+  <div class="tabpane on" id="ipo-open"><div class="grid g3" id="ipoOpen"></div></div>
+  <div class="tabpane" id="ipo-up"><div class="grid g3" id="ipoUp"></div></div>
+  <div class="tabpane" id="ipo-listed"><div class="card"><h3>Listing Performance Tracker <span class="tag">Issue → LTP</span></h3>
+    <div class="tblwrap"><table id="tListed"></table></div></div></div>
+  <div class="tabpane" id="ipo-sme"><div class="card"><h3>SME Platform — NSE Emerge / BSE SME</h3><div class="tblwrap"><table id="tSme"></table></div>
+    <div class="dis">SME IPOs have min lot value ~₹1–1.5 lakh, lower liquidity and lighter disclosure norms. Higher risk category.</div></div></div>
+
+  <!-- DEEP DIVE -->
+  <div class="card" id="ipoDetail" style="margin-top:18px"></div>
+</div>
+
+<!-- =========================================================
+     10. CALENDAR
+========================================================= -->
+<div class="sec" id="s-cal">
+  <h1>Corporate Events Calendar</h1>
+  <div class="sub">Board meetings · results · bonus · splits · dividends · rights · buybacks — with ex-dates &amp; record dates</div>
+
+  <div class="rowflex" style="margin-bottom:14px">
+    <button class="btn on" data-ef="all">All Events</button>
+    <button class="btn" data-ef="board">Board Meeting</button>
+    <button class="btn" data-ef="result">Results</button>
+    <button class="btn" data-ef="bonus">Bonus Issue</button>
+    <button class="btn" data-ef="split">Stock Split</button>
+    <button class="btn" data-ef="div">Dividend</button>
+    <button class="btn" data-ef="rights">Rights</button>
+    <button class="btn" data-ef="buyback">Buyback</button>
+    <button class="btn" data-ef="agm">AGM/EGM</button>
+    <div class="spacer"></div>
+    <button class="btn" id="calPrev">‹</button>
+    <b id="calLabel" style="min-width:150px;text-align:center"></b>
+    <button class="btn" id="calNext">›</button>
+  </div>
+
+  <div class="card"><div class="cal" id="calGrid"></div></div>
+
+  <div class="grid g2">
+    <div class="card"><h3>Upcoming Corporate Actions <span class="tag src">BSE Corp-Actions / NSE</span></h3>
+      <div class="tblwrap"><table id="tCA"></table></div></div>
+    <div class="card"><h3>Board Meeting Purposes <span class="tag src">NSE/BSE board-meetings</span></h3>
+      <div class="tblwrap"><table id="tBM"></table></div>
+      <div class="dis"><b>Record date</b> = date the register is frozen to decide entitlement. <b>Ex-date</b> = usually 1 trading day earlier under T+1; buy on/after ex-date and you do <i>not</i> get the benefit.</div></div>
+  </div>
+</div>
+
+<!-- =========================================================
+     11. FILINGS
+========================================================= -->
+<div class="sec" id="s-filings">
+  <h1>Corporate Filings &amp; Disclosures</h1>
+  <div class="sub">Exchange announcements, insider trades, shareholding patterns and pledge disclosures</div>
+
+  <div class="tabs" data-tabs="fl">
+    <div class="tab on" data-t="ann">Announcements</div>
+    <div class="tab" data-t="ins">Insider Trading (SAST/PIT)</div>
+    <div class="tab" data-t="shp">Shareholding Pattern</div>
+    <div class="tab" data-t="pl">Pledge Disclosures</div>
+    <div class="tab" data-t="res">Financial Results</div>
+  </div>
+  <div class="tabpane on" id="fl-ann"><div class="card"><h3>Latest Exchange Announcements <span class="tag src">NSE + BSE</span></h3><div class="tblwrap"><table id="tAnn"></table></div></div></div>
+  <div class="tabpane" id="fl-ins"><div class="card"><h3>Insider / Promoter Transactions <span class="tag src">SEBI PIT Reg 7(2)</span></h3><div class="tblwrap"><table id="tIns"></table></div></div></div>
+  <div class="tabpane" id="fl-shp"><div class="card"><h3>Shareholding Pattern Changes <span class="tag">QoQ</span></h3><div class="tblwrap"><table id="tShp"></table></div></div></div>
+  <div class="tabpane" id="fl-pl"><div class="card"><h3>Promoter Pledge <span class="tag src">Reg 31(1)</span></h3><div class="tblwrap"><table id="tPl"></table></div></div></div>
+  <div class="tabpane" id="fl-res"><div class="card"><h3>Results Filed <span class="tag src">Reg 33</span></h3><div class="tblwrap"><table id="tRes"></table></div></div></div>
+</div>
+
+<!-- =========================================================
+     12. NEWS
+========================================================= -->
+<div class="sec" id="s-news">
+  <h1>News Terminal</h1>
+  <div class="sub">Aggregated market intelligence across every asset class</div>
+
+  <div class="tabs" data-tabs="nw">
+    <div class="tab on" data-t="all">All</div>
+    <div class="tab" data-t="stocks">Stocks &amp; Equity</div>
+    <div class="tab" data-t="comm">Commodities</div>
+    <div class="tab" data-t="gold">Gold &amp; Bullion</div>
+    <div class="tab" data-t="bond">Bonds &amp; Rates</div>
+    <div class="tab" data-t="mf">Mutual Funds</div>
+    <div class="tab" data-t="ipo">IPO</div>
+    <div class="tab" data-t="policy">Policy / Regulatory</div>
+    <div class="tab" data-t="global">Global</div>
+    <div class="tab" data-t="earn">Earnings</div>
+  </div>
+  <div class="card" style="padding:0" id="newsList"></div>
+</div>
+
+<!-- =========================================================
+     13. TOOLS
+========================================================= -->
+<div class="sec" id="s-tools">
+  <h1>Calculators</h1>
+  <div class="sub">Quick planning maths for SIP, lumpsum, goals and asset allocation</div>
+  <div class="grid g2">
+    <div class="card">
+      <h3>SIP Calculator</h3>
+      <div id="sipForm"></div>
+      <div class="grid g3" style="margin-top:14px">
+        <div class="stat"><div class="l">Invested</div><div class="v" id="sipInv">—</div></div>
+        <div class="stat"><div class="l">Est. Value</div><div class="v up" id="sipVal">—</div></div>
+        <div class="stat"><div class="l">Gain</div><div class="v" style="color:var(--gold)" id="sipGain">—</div></div>
+      </div>
+      <div class="chartbox sm" style="margin-top:12px"><canvas id="cSip"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Suggested Asset Allocation <span class="tag">By risk profile</span></h3>
+      <div class="tblwrap"><table id="tAlloc"></table></div>
+      <div class="dis">Illustrative model portfolios only — not personalised advice. Rebalance annually or on ±5% drift.</div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Taxation Quick-Reference (India, FY 2025-26) <span class="tag">Verify with a CA</span></h3>
+    <div class="tblwrap"><table id="tTax"></table></div>
+  </div>
+</div>
+
+<!-- =========================================================
+     14. FEEDS / API
+========================================================= -->
+<div class="sec" id="s-feeds">
+  <h1>Data Sources &amp; Live Wiring</h1>
+  <div class="sub">Exactly how to replace every simulated number with genuine exchange data</div>
+
+  <div class="banner"><span style="font-size:16px">🔌</span>
+  <div><b>Why a proxy is required:</b> NSE, BSE, MCX and Moneycontrol all block direct browser <code>fetch()</code> calls (no CORS headers, cookie/User-Agent gating). Run the small proxy below on localhost, then point <code>FEEDS.base</code> at it. The dashboard's <code>loadLive()</code> function will take over from the simulator automatically.</div></div>
+
+  <div class="card"><h3>Official Endpoint Registry</h3><div class="tblwrap"><table id="tFeeds"></table></div></div>
+
+  <div class="grid g2">
+    <div class="card"><h3>Minimal Node Proxy <span class="tag">server.js</span></h3>
+<pre>// npm i express node-fetch cors
+const express=require('express'),cors=require('cors');
+const fetch=(...a)=>import('node-fetch').then(m=>m.default(...a));
+const app=express(); app.use(cors());
+
+const H={'User-Agent':'Mozilla/5.0','Accept':'*/*',
+  'Accept-Language':'en-US,en;q=0.9','Referer':'https://www.nseindia.com/'};
+let jar='';
+
+// NSE needs a cookie handshake first
+async function nse(path){
+  if(!jar){const r=await fetch('https://www.nseindia.com',{headers:H});
+    jar=(r.headers.raw()['set-cookie']||[]).map(c=>c.split(';')[0]).join('; ');}
+  const r=await fetch('https://www.nseindia.com'+path,{headers:{...H,Cookie:jar}});
+  if(r.status===401){jar='';return nse(path);}         // refresh & retry
+  return r.json();
+}
+
+app.get('/nse/*',async(q,s)=>{try{s.json(await nse('/'+q.params[0]+
+  (q.url.includes('?')?q.url.slice(q.url.indexOf('?')):'')))}catch(e){s.status(500).json({e:e.message})}});
+
+app.get('/amfi',async(q,s)=>{const r=await fetch('https://www.amfiindia.com/spages/NAVAll.txt');
+  s.type('text/plain').send(await r.text())});
+
+app.get('/mfapi/:code',async(q,s)=>{const r=await fetch('https://api.mfapi.in/mf/'+q.params.code);
+  s.json(await r.json())});
+
+app.listen(8080,()=>console.log('proxy → http://localhost:8080'));</pre>
+    </div>
+    <div class="card"><h3>Wiring it in <span class="tag">dashboard side</span></h3>
+<pre>// 1) set the base
+FEEDS.base = 'http://localhost:8080';
+FEEDS.enabled = true;
+
+// 2) example: real NIFTY 50 constituents + index
+async function pullNifty(){
+  const j = await fetch(FEEDS.base+
+    '/nse/api/equity-stockIndices?index=NIFTY%2050').then(r=>r.json());
+  const idx = j.data.find(d=>d.symbol==='NIFTY 50');
+  setQuote('NIFTY50', idx.lastPrice, idx.pChange);
+  j.data.filter(d=>d.symbol!=='NIFTY 50').forEach(d=>
+    setQuote(d.symbol, d.lastPrice, d.pChange));
+}
+
+// 3) real mutual fund NAV history (free, no key)
+async function pullFund(schemeCode){
+  const j = await fetch(FEEDS.base+'/mfapi/'+schemeCode).then(r=>r.json());
+  return j.data;   // [{date:'05-02-2025', nav:'112.4471'}, ...]
+}
+
+// 4) swap the simulator for the real poller
+clearInterval(SIM.timer);
+setInterval(()=>{ pullNifty(); }, 15000);   // respect rate limits!</pre>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Compliance &amp; Etiquette</h3>
+    <ul style="font-size:12.6px;color:#c3d0e4;padding-left:20px;line-height:1.9">
+      <li>NSE/BSE data is licensed. Personal, non-commercial dashboards are generally tolerated; <b>redistribution or commercial use requires a data-vendor licence</b> from the exchange.</li>
+      <li>Poll no faster than every 5–15 seconds. Aggressive scraping gets your IP blocked within minutes.</li>
+      <li>For production-grade reliability use a licensed API: <b>Zerodha Kite Connect</b>, <b>Upstox</b>, <b>Angel One SmartAPI</b>, <b>Dhan</b>, <b>ICICI Breeze</b>, <b>Fyers</b>, or global vendors like Alpha Vantage / Twelve Data / Financial Modeling Prep.</li>
+      <li>Grey Market Premium is an <b>unofficial, unregulated</b> indicator quoted by private dealers. SEBI does not recognise it. Treat it as sentiment, never as a valuation.</li>
+      <li>This dashboard is an information tool, not investment advice. Verify every figure against the primary source before acting.</li>
+    </ul>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<script>
+/* ==========================================================================
+   FinDeck — engine
+   ========================================================================== */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const fmt=(n,d=2)=>n==null?'—':Number(n).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
+const sgn=n=>(n>0?'+':'')+n.toFixed(2);
+const cls=n=>n>0?'up':n<0?'dn':'fl';
+const arrow=n=>n>0?'▲':n<0?'▼':'■';
+const cr=n=>'₹'+fmt(n,2)+' Cr';
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const D=o=>{const d=new Date();d.setDate(d.getDate()+o);return d;};
+const dstr=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+const dfull=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+
+/* ---------- FEEDS registry (real endpoints) ---------- */
+const FEEDS={base:'',enabled:false,list:[
+ ['NSE','Index + constituents','/api/equity-stockIndices?index=NIFTY%2050','JSON'],
+ ['NSE','All indices snapshot','/api/allIndices','JSON'],
+ ['NSE','Gainers / losers','/api/live-analysis-variations?index=gainers','JSON'],
+ ['NSE','Most active (value)','/api/live-analysis-most-active-securities?index=value','JSON'],
+ ['NSE','52-week high / low','/api/live-analysis-data-52weekhighstock','JSON'],
+ ['NSE','Corporate announcements','/api/corporate-announcements?index=equities','JSON'],
+ ['NSE','Board meetings','/api/corporate-board-meetings?index=equities','JSON'],
+ ['NSE','Corporate actions (bonus/split/div)','/api/corporates-corporateActions?index=equities','JSON'],
+ ['NSE','Insider trading (PIT)','/api/corporates-pit','JSON'],
+ ['NSE','Shareholding pattern','/api/corporate-share-holdings-master','JSON'],
+ ['NSE','Bulk & block deals','/api/historicalOR/bulk-block-short-deals','JSON'],
+ ['NSE','FII / DII activity','/api/fiidiiTradeReact','JSON'],
+ ['NSE','IPO — current issues','/api/ipo-current-issue','JSON'],
+ ['NSE','IPO — upcoming','/api/all-upcoming-issues?category=ipo','JSON'],
+ ['NSE','IPO — bid details (live subscription)','/api/ipo-detail?symbol=XXX&series=EQ','JSON'],
+ ['NSE','SGB / bond quotes','/api/quote-bonds?index=sgb','JSON'],
+ ['NSE','Option chain (indices)','/api/option-chain-indices?symbol=NIFTY','JSON'],
+ ['BSE','Corporate announcements','api.bseindia.com/BseIndiaAPI/api/AnnGetData/w','JSON'],
+ ['BSE','Corporate actions','api.bseindia.com/BseIndiaAPI/api/CorpactCF/w','JSON'],
+ ['BSE','Board meetings','api.bseindia.com/BseIndiaAPI/api/BoardMeeting/w','JSON'],
+ ['BSE','Sensex / index snapshot','api.bseindia.com/BseIndiaAPI/api/DefaultData/w','JSON'],
+ ['BSE','Bulk deals daily file','www.bseindia.com/markets/equity/EQReports/bulk_deals.aspx','CSV'],
+ ['MCX','Market watch (all futures)','www.mcxindia.com/backpage.aspx/GetMarketWatch','JSON'],
+ ['MCX','Bhavcopy (EOD)','www.mcxindia.com/market-data/bhavcopy','CSV'],
+ ['NCDEX','Agri futures live','www.ncdex.com/markets/live-quotes','HTML'],
+ ['AMFI','All-scheme NAV (daily)','www.amfiindia.com/spages/NAVAll.txt','TXT'],
+ ['MFAPI','Free NAV history by scheme code','api.mfapi.in/mf/{schemeCode}','JSON'],
+ ['RBI','Policy rates / SDL / G-Sec','rbi.org.in — DBIE database','HTML/XLS'],
+ ['CCIL','NDS-OM G-Sec traded yields','www.ccilindia.com','HTML'],
+ ['SEBI','Filings, DRHP, RHP','www.sebi.gov.in/filings','PDF'],
+ ['IBJA','Benchmark gold/silver rates','ibjarates.com','HTML'],
+ ['Moneycontrol','News RSS (markets)','www.moneycontrol.com/rss/marketreports.xml','RSS'],
+ ['Moneycontrol','News RSS (business)','www.moneycontrol.com/rss/business.xml','RSS'],
+ ['Economic Times','Markets RSS','economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms','RSS'],
+ ['Business Standard','Markets RSS','www.business-standard.com/rss/markets-106.rss','RSS'],
+ ['World Bank / FRED','Global yields & macro','fred.stlouisfed.org/docs/api','JSON'],
+]};
+
+/* ==========================================================================
+   INSTRUMENT UNIVERSE  (SAMPLE seed values → live-simulated)
+   ========================================================================== */
+const INST={};
+function reg(id,name,px,vol,dec=2,extra={}){
+  INST[id]={id,name,px,base:px,open:px,prev:px*(1-rnd(-0.008,0.008)),vol,dec,
+            hist:Array.from({length:60},(_,i)=>px*(1+Math.sin(i/7)*vol*0.4+rnd(-vol,vol)*0.5)),...extra};
+  INST[id].chg=(INST[id].px/INST[id].prev-1)*100;
+  return INST[id];
+}
+/* Indian indices */
+reg('NIFTY50','NIFTY 50',24812.55,.004);
+reg('SENSEX','SENSEX',81420.30,.004);
+reg('BANKNIFTY','BANK NIFTY',55190.85,.005);
+reg('FINNIFTY','FIN NIFTY',26140.20,.005);
+reg('MIDCAP','NIFTY MIDCAP 100',58230.40,.006);
+reg('SMALLCAP','NIFTY SMALLCAP 100',18420.75,.007);
+reg('NEXT50','NIFTY NEXT 50',68140.10,.006);
+reg('VIX','INDIA VIX',13.85,.03);
+/* Sectors */
+const SECT=[['IT','NIFTY IT',42180],['BANK','NIFTY BANK',55190],['AUTO','NIFTY AUTO',24350],
+ ['FMCG','NIFTY FMCG',56820],['PHARMA','NIFTY PHARMA',22140],['METAL','NIFTY METAL',9420],
+ ['REALTY','NIFTY REALTY',1042],['ENERGY','NIFTY ENERGY',38210],['PSUBANK','NIFTY PSU BANK',6840],
+ ['MEDIA','NIFTY MEDIA',1685],['INFRA','NIFTY INFRA',9120],['CONSDUR','NIFTY CONS DURABLE',41200]];
+SECT.forEach(s=>reg('S_'+s[0],s[1],s[2],.008));
+/* Commodities — MCX */
+const MCXC=[['GOLD','GOLD (Feb)',77840,10,'₹/10g','Gold 995 · 1kg lot'],
+ ['SILVER','SILVER (Mar)',92150,10,'₹/kg','30 kg lot'],
+ ['GOLDM','GOLD MINI',77620,10,'₹/10g','100 g'],
+ ['SILVERM','SILVER MICRO',92040,10,'₹/kg','1 kg'],
+ ['CRUDE','CRUDEOIL',6142,10,'₹/bbl','100 bbl'],
+ ['NATGAS','NATURALGAS',248.6,10,'₹/mmBtu','1250 mmBtu'],
+ ['COPPER','COPPER',842.5,10,'₹/kg','2500 kg'],
+ ['ZINC','ZINC',272.4,10,'₹/kg','5000 kg'],
+ ['ALUMI','ALUMINIUM',241.8,10,'₹/kg','5000 kg'],
+ ['LEAD','LEAD',180.3,10,'₹/kg','5000 kg'],
+ ['NICKEL','NICKEL',1348,10,'₹/kg','1500 kg'],
+ ['MENTHA','MENTHAOIL',942.2,10,'₹/kg','360 kg']];
+MCXC.forEach(c=>reg('M_'+c[0],c[1],c[2],.008,2,{unit:c[4],lot:c[5]}));
+/* International commodities */
+reg('XAU','COMEX Gold',2648.40,.006,2);
+reg('XAG','COMEX Silver',30.72,.010,2);
+reg('BRENT','Brent Crude',74.85,.011,2);
+reg('WTI','WTI Crude',71.20,.011,2);
+reg('LMECU','LME Copper (3M)',9042,.008,0);
+reg('NGUS','Henry Hub NatGas',3.42,.020,2);
+/* FX & crypto */
+reg('USDINR','USD/INR',86.42,.002,4);
+reg('EURINR','EUR/INR',90.18,.003,4);
+reg('GBPINR','GBP/INR',107.65,.003,4);
+reg('JPYINR','JPY/INR (100)',55.20,.003,4);
+reg('DXY','Dollar Index',108.35,.003,2);
+reg('BTC','Bitcoin (USD)',96420,.018,0);
+reg('ETH','Ethereum (USD)',3312,.022,0);
+/* Bonds — yields */
+const BONDS=[['IN10','India 10Y',6.712,'🇮🇳','India'],['IN5','India 5Y',6.585,'🇮🇳','India'],
+ ['IN2','India 2Y',6.482,'🇮🇳','India'],['IN30','India 30Y',7.045,'🇮🇳','India'],
+ ['US10','US 10Y',4.512,'🇺🇸','United States'],['US2','US 2Y',4.268,'🇺🇸','United States'],
+ ['US30','US 30Y',4.728,'🇺🇸','United States'],['UK10','UK 10Y',4.612,'🇬🇧','United Kingdom'],
+ ['DE10','Germany 10Y',2.482,'🇩🇪','Germany'],['FR10','France 10Y',3.238,'🇫🇷','France'],
+ ['IT10','Italy 10Y',3.612,'🇮🇹','Italy'],['JP10','Japan 10Y',1.182,'🇯🇵','Japan'],
+ ['CN10','China 10Y',1.678,'🇨🇳','China'],['AU10','Australia 10Y',4.482,'🇦🇺','Australia'],
+ ['CA10','Canada 10Y',3.288,'🇨🇦','Canada'],['BR10','Brazil 10Y',14.82,'🇧🇷','Brazil'],
+ ['ZA10','South Africa 10Y',9.145,'🇿🇦','South Africa'],['KR10','South Korea 10Y',2.842,'🇰🇷','South Korea'],
+ ['ID10','Indonesia 10Y',7.048,'🇮🇩','Indonesia'],['MX10','Mexico 10Y',10.42,'🇲🇽','Mexico']];
+BONDS.forEach(b=>reg('B_'+b[0],b[1],b[2],.004,3,{flag:b[3],ctry:b[4]}));
+/* Global indices */
+const GLOB=[['DJI','Dow Jones',44280,'🇺🇸','Americas'],['SPX','S&P 500',6042,'🇺🇸','Americas'],
+ ['IXIC','Nasdaq Comp',19845,'🇺🇸','Americas'],['RUT','Russell 2000',2318,'🇺🇸','Americas'],
+ ['GSPTSE','TSX Composite',24960,'🇨🇦','Americas'],['BVSP','Bovespa',122840,'🇧🇷','Americas'],
+ ['UKX','FTSE 100',8342,'🇬🇧','Europe'],['DAX','DAX 40',20180,'🇩🇪','Europe'],
+ ['CAC','CAC 40',7480,'🇫🇷','Europe'],['SX5E','Euro Stoxx 50',4920,'🇪🇺','Europe'],
+ ['SMI','SMI',11720,'🇨🇭','Europe'],['N225','Nikkei 225',39420,'🇯🇵','Asia'],
+ ['HSI','Hang Seng',19680,'🇭🇰','Asia'],['SHCOMP','Shanghai Comp',3285,'🇨🇳','Asia'],
+ ['KOSPI','KOSPI',2482,'🇰🇷','Asia'],['TWII','Taiwan Weighted',23140,'🇹🇼','Asia'],
+ ['STI','Straits Times',3742,'🇸🇬','Asia'],['AXJO','ASX 200',8320,'🇦🇺','Asia'],
+ ['JKSE','Jakarta Comp',7180,'🇮🇩','Asia'],['TASI','Tadawul',12080,'🇸🇦','MEA']];
+GLOB.forEach(g=>reg('G_'+g[0],g[1],g[2],.006,2,{flag:g[3],reg:g[4]}));
+/* Stocks */
+const STK=[['RELIANCE','Reliance Industries',1284.50,'Energy'],['TCS','Tata Consultancy',4142.80,'IT'],
+ ['HDFCBANK','HDFC Bank',1748.20,'Bank'],['ICICIBANK','ICICI Bank',1284.60,'Bank'],
+ ['INFY','Infosys',1892.40,'IT'],['BHARTIARTL','Bharti Airtel',1620.30,'Telecom'],
+ ['SBIN','State Bank of India',782.45,'Bank'],['ITC','ITC Ltd',462.80,'FMCG'],
+ ['LT','Larsen & Toubro',3620.90,'Infra'],['HINDUNILVR','Hindustan Unilever',2380.50,'FMCG'],
+ ['KOTAKBANK','Kotak Mahindra Bank',1782.30,'Bank'],['AXISBANK','Axis Bank',1042.60,'Bank'],
+ ['MARUTI','Maruti Suzuki',11240,'Auto'],['SUNPHARMA','Sun Pharma',1782.40,'Pharma'],
+ ['TATAMOTORS','Tata Motors',742.30,'Auto'],['TITAN','Titan Company',3348.20,'Cons'],
+ ['ULTRACEMCO','UltraTech Cement',11480,'Cement'],['BAJFINANCE','Bajaj Finance',7180.50,'NBFC'],
+ ['NTPC','NTPC Ltd',330.80,'Power'],['POWERGRID','Power Grid',298.40,'Power'],
+ ['ONGC','ONGC',242.60,'Energy'],['TATASTEEL','Tata Steel',132.40,'Metal'],
+ ['JSWSTEEL','JSW Steel',942.80,'Metal'],['HINDALCO','Hindalco',618.20,'Metal'],
+ ['WIPRO','Wipro',298.60,'IT'],['HCLTECH','HCL Technologies',1880.40,'IT'],
+ ['ADANIENT','Adani Enterprises',2380.60,'Divers'],['ADANIPORTS','Adani Ports',1142.30,'Infra'],
+ ['COALINDIA','Coal India',382.40,'Mining'],['ASIANPAINT','Asian Paints',2280.70,'Cons'],
+ ['NESTLEIND','Nestle India',2180.30,'FMCG'],['DMART','Avenue Supermarts',3620.40,'Retail'],
+ ['ZOMATO','Eternal (Zomato)',242.80,'Tech'],['DIXON','Dixon Technologies',15420,'EMS'],
+ ['TRENT','Trent Ltd',6420.50,'Retail'],['BEL','Bharat Electronics',282.60,'Defence'],
+ ['HAL','Hindustan Aeronautics',4142.30,'Defence'],['IRFC','IRFC',142.80,'NBFC'],
+ ['VBL','Varun Beverages',612.40,'FMCG'],['PERSISTENT','Persistent Systems',5820.60,'IT'],
+ ['CDSL','CDSL',1720.40,'Fin Infra'],['POLYCAB','Polycab India',6820.30,'Cables'],
+ ['MAZDOCK','Mazagon Dock',2280.50,'Defence'],['SUZLON','Suzlon Energy',62.40,'Renew'],
+ ['IREDA','IREDA',192.60,'NBFC'],['YESBANK','Yes Bank',19.85,'Bank'],
+ ['PNB','Punjab National Bank',102.40,'Bank'],['IDFCFIRSTB','IDFC First Bank',62.80,'Bank'],
+ ['JIOFIN','Jio Financial',298.40,'NBFC'],['LICI','LIC of India',908.60,'Insurance']];
+STK.forEach(s=>reg('E_'+s[0],s[1],s[2],.012,2,{sector:s[3],sym:s[0]}));
+
+/* ==========================================================================
+   SIMULATION ENGINE
+   ========================================================================== */
+const SIM={on:true,timer:null,tick:0};
+function step(){
+  SIM.tick++;
+  for(const k in INST){
+    const i=INST[k];
+    const drift=Math.sin((SIM.tick+k.length*11)/40)*i.base*i.vol*0.15;
+    i.px=Math.max(0.0001,i.px+drift+ (Math.random()-0.5)*i.base*i.vol);
+    i.chg=(i.px/i.prev-1)*100;
+    i.hist.push(i.px); if(i.hist.length>60)i.hist.shift();
+  }
+  paint();
+}
+function setQuote(id,px,chg){const i=INST[id];if(!i)return;i.px=px;i.chg=chg;i.hist.push(px);if(i.hist.length>60)i.hist.shift();}
+
+function paint(){
+  $$('[data-p]').forEach(e=>{
+    const i=INST[e.dataset.p]; if(!i)return;
+    const v=fmt(i.px,e.dataset.dec?+e.dataset.dec:i.dec);
+    if(e.textContent!==v){
+      const upd=parseFloat(v.replace(/,/g,''))>parseFloat((e.textContent||'0').replace(/,/g,''));
+      e.textContent=v; e.classList.remove('flash-u','flash-d');
+      void e.offsetWidth; e.classList.add(upd?'flash-u':'flash-d');
+    }
+  });
+  $$('[data-c]').forEach(e=>{
+    const i=INST[e.dataset.c]; if(!i)return;
+    const abs=i.px-i.prev;
+    e.className=(e.dataset.k||'')+' '+cls(i.chg);
+    e.textContent=(e.dataset.mode==='pct')?`${arrow(i.chg)} ${sgn(i.chg)}%`
+      :`${arrow(i.chg)} ${fmt(Math.abs(abs),i.dec)} (${sgn(i.chg)}%)`;
+  });
+  $$('canvas[data-spark]').forEach(c=>spark(c,INST[c.dataset.spark]));
+  if(CH.index){const i=INST.NIFTY50;CH.index.data.datasets[0].data=i.hist.slice(-60);CH.index.update('none');}
+  updHeat();
+}
+function spark(cv,i){
+  if(!i)return; const w=cv.width=cv.clientWidth*2, h=cv.height=cv.clientHeight*2;
+  const g=cv.getContext('2d'), d=i.hist.slice(-40), mn=Math.min(...d), mx=Math.max(...d), r=(mx-mn)||1;
+  g.clearRect(0,0,w,h); g.lineWidth=2.4; g.strokeStyle=i.chg>=0?'#16c784':'#ea3943';
+  g.beginPath();
+  d.forEach((v,x)=>{const px=x/(d.length-1)*w, py=h-4-((v-mn)/r)*(h-8); x?g.lineTo(px,py):g.moveTo(px,py);});
+  g.stroke();
+  const grad=g.createLinearGradient(0,0,0,h);
+  grad.addColorStop(0,i.chg>=0?'rgba(22,199,132,.28)':'rgba(234,57,67,.28)');
+  grad.addColorStop(1,'rgba(0,0,0,0)');
+  g.lineTo(w,h);g.lineTo(0,h);g.closePath();g.fillStyle=grad;g.fill();
+}
+
+/* ==========================================================================
+   NAV / TABS
+   ========================================================================== */
+$$('.nav').forEach(n=>n.onclick=()=>{
+  $$('.nav').forEach(x=>x.classList.remove('on')); n.classList.add('on');
+  $$('.sec').forEach(x=>x.classList.remove('on'));
+  $('#s-'+n.dataset.s).classList.add('on');
+  window.scrollTo({top:0,behavior:'smooth'});
+  buildCharts(n.dataset.s);
+});
+$$('.tabs').forEach(tb=>{
+  const g=tb.dataset.tabs;
+  $$('.tab',tb).forEach(t=>t.onclick=()=>{
+    $$('.tab',tb).forEach(x=>x.classList.remove('on')); t.classList.add('on');
+    $$('[id^="'+g+'-"]').forEach(p=>p.classList.remove('on'));
+    const p=$('#'+g+'-'+t.dataset.t); if(p)p.classList.add('on');
+    if(g==='mf')renderMFChart();
+  });
+});
+$('#liveBtn').onclick=function(){
+  SIM.on=!SIM.on; this.classList.toggle('on',SIM.on);
+  this.textContent=SIM.on?'● LIVE SIM':'⏸ PAUSED';
+};
+$('#gsearch').oninput=function(){
+  const q=this.value.toLowerCase(), sec=$('.sec.on');
+  $$('tbody tr',sec).forEach(r=>r.style.display=r.textContent.toLowerCase().includes(q)?'':'none');
+  $$('.tile,.ipo,.news',sec).forEach(r=>r.style.display=r.textContent.toLowerCase().includes(q)?'':'none');
+};
+
+/* ---------- clock + market status ---------- */
+function clock(){
+  const now=new Date();
+  const ist=new Date(now.toLocaleString('en-US',{timeZone:'Asia/Kolkata'}));
+  $('#clock').textContent=ist.toLocaleTimeString('en-IN',{hour12:false})+' IST · '+dfull(ist);
+  const m=ist.getHours()*60+ist.getMinutes(), wd=ist.getDay()>0&&ist.getDay()<6;
+  const st=(w,o,c,pre)=>{
+    if(!w)return['off','Closed · Weekend'];
+    if(m>=o&&m<c)return['on','Open'];
+    if(pre&&m>=pre&&m<o)return['pre','Pre-Open'];
+    return['off','Closed'];
+  };
+  const rows=[
+    ['NSE / BSE',...st(wd,555,930,540)],
+    ['MCX',...st(wd,540,1410)],
+    ['Currency',...st(wd,540,1020)],
+    ['US Mkt',...st(wd,1200,1560)],
+    ['Crypto','on','24×7']
+  ];
+  $('#mktStatus').innerHTML=rows.map(r=>
+    `<div class="chip"><span class="led ${r[1]}"></span><b>${r[0]}</b> <span style="color:var(--mut)">${r[2]}</span></div>`).join('');
+}
+
+/* ==========================================================================
+   RENDERERS
+   ========================================================================== */
+function tile(id,extra=''){
+  const i=INST[id];
+  return `<div class="tile"><div class="nm"><span>${i.name}</span>${extra}</div>
+   <div class="px" data-p="${id}">${fmt(i.px,i.dec)}</div>
+   <div class="ch" data-c="${id}"></div>
+   <canvas data-spark="${id}" style="width:100%;height:34px"></canvas></div>`;
+}
+function T(head,rows){
+  return `<thead><tr>${head.map(h=>`<th class="${/^#/.test(h)?'num':''}">${h.replace(/^#/,'')}</th>`).join('')}</tr></thead><tbody>${rows}</tbody>`;
+}
+
+/* ---------- OVERVIEW ---------- */
+$('#idxTiles').innerHTML=['NIFTY50','SENSEX','BANKNIFTY','MIDCAP','SMALLCAP','NEXT50','FINNIFTY','VIX','S_IT','S_AUTO']
+  .map(id=>tile(id,`<span class="pill m">${id==='VIX'?'VOL':'IDX'}</span>`)).join('');
+$('#eqIdx').innerHTML=['NIFTY50','SENSEX','BANKNIFTY','FINNIFTY','MIDCAP','SMALLCAP'].map(id=>tile(id)).join('');
+$('#commTiles').innerHTML=['M_GOLD','M_SILVER','M_CRUDE','M_NATGAS','M_COPPER','M_ZINC','M_ALUMI','M_NICKEL']
+  .map(id=>tile(id,`<span class="pill y">MCX</span>`)).join('');
+$('#goldTop').innerHTML=['M_GOLD','M_SILVER','XAU','XAG'].map(id=>tile(id)).join('');
+$('#bondTop').innerHTML=['B_IN10','B_US10','B_UK10','B_DE10','B_JP10'].map(id=>tile(id,'<span class="pill b">YIELD</span>')).join('');
+$('#fxTiles').innerHTML=['USDINR','EURINR','GBPINR','DXY','BTC','ETH','JPYINR'].map(id=>tile(id)).join('');
+
+function mini(list){return list.map(id=>{const i=INST[id];
+  return `<div class="kv"><span>${i.name}</span><span><span data-p="${id}"></span> <span style="font-size:10.5px" data-c="${id}" data-mode="pct"></span></span></div>`;}).join('');}
+$('#ovGold').innerHTML=mini(['M_GOLD','M_SILVER','XAU','XAG','M_GOLDM']);
+$('#ovEnergy').innerHTML=mini(['M_CRUDE','BRENT','WTI','M_NATGAS','NGUS']);
+$('#ovBond').innerHTML=mini(['B_IN10','B_US10','B_UK10','B_DE10','B_JP10']);
+$('#ovFx').innerHTML=mini(['USDINR','EURINR','GBPINR','DXY','BTC']);
+
+/* ticker */
+(function(){
+  const ids=['NIFTY50','SENSEX','BANKNIFTY','MIDCAP','SMALLCAP','M_GOLD','M_SILVER','M_CRUDE','USDINR',
+   'B_IN10','B_US10','G_DJI','G_SPX','G_IXIC','G_N225','G_HSI','BTC','ETH','XAU','BRENT','DXY','VIX'];
+  const html=ids.map(id=>`<span class="tk"><span class="n">${INST[id].name}</span>
+    <span data-p="${id}"></span><span data-c="${id}" data-mode="pct" style="font-size:11.5px"></span></span>`).join('');
+  $('#ticker').innerHTML=html+html;
+})();
+
+/* heatmap */
+function updHeat(){
+  const el=$('#heatmap'); if(!el)return;
+  el.innerHTML=SECT.map(s=>{
+    const i=INST['S_'+s[0]], c=i.chg;
+    const a=Math.min(Math.abs(c)/2.2,1)*.62+.10;
+    const bg=c>=0?`rgba(22,199,132,${a})`:`rgba(234,57,67,${a})`;
+    return `<div class="hcell" style="background:${bg}">${s[1].replace('NIFTY ','')}
+      <div class="hv">${sgn(c)}%</div></div>`;}).join('');
+}
+
+/* flows */
+$('#tFlows').innerHTML=T(['Date','Segment','#Buy (₹Cr)','#Sell (₹Cr)','#Net (₹Cr)'],
+ [[0,'FII Cash',18420,19180],[0,'DII Cash',16240,14180],[1,'FII Cash',14280,13120],
+  [1,'DII Cash',11840,12420],[2,'FII F&O Index',48200,46180],[2,'DII Cash',13820,11940]]
+ .map(r=>{const net=r[2]-r[3];return `<tr><td>${dstr(D(-r[0]))}</td><td class="sym">${r[1]}</td>
+  <td class="num">${fmt(r[2],0)}</td><td class="num">${fmt(r[3],0)}</td>
+  <td class="num ${cls(net)}">${net>0?'+':''}${fmt(net,0)}</td></tr>`;}).join(''));
+
+/* ---------- EQUITY tables ---------- */
+const stocks=STK.map(s=>({...INST['E_'+s[0]]}));
+function stkRows(list,extra){
+  return list.map(s=>{const i=INST[s.id];
+    return `<tr><td class="sym">${i.sym}<div class="tiny">${i.name}</div></td>
+     <td><span class="pill m">${i.sector}</span></td>
+     <td class="num" data-p="${i.id}"></td>
+     <td class="num" data-c="${i.id}" data-mode="pct"></td>
+     ${extra?extra(i):''}</tr>`;}).join('');
+}
+function refreshMovers(){
+  const arr=[...stocks].map(s=>INST[s.id]).sort((a,b)=>b.chg-a.chg);
+  $('#tGain').innerHTML=T(['Symbol','Sector','#LTP','#Chg%','#Volume'],stkRows(arr.slice(0,12),
+    i=>`<td class="num tiny">${fmt(rnd(4,120),1)}L</td>`));
+  $('#tLose').innerHTML=T(['Symbol','Sector','#LTP','#Chg%','#Volume'],stkRows(arr.slice(-12).reverse(),
+    i=>`<td class="num tiny">${fmt(rnd(4,120),1)}L</td>`));
+}
+refreshMovers(); setInterval(refreshMovers,9000);
+
+$('#tActive').innerHTML=T(['Symbol','Sector','#LTP','#Chg%','#Turnover ₹Cr','#Volume','#Deliv %'],
+ stkRows(stocks.slice(0,18),i=>`<td class="num">${fmt(rnd(300,4200),0)}</td>
+  <td class="num tiny">${fmt(rnd(5,180),1)}L</td><td class="num">${fmt(rnd(28,86),1)}</td>`));
+
+$('#tHigh').innerHTML=T(['Symbol','#LTP','#52W High','#Chg%'],
+ stkRows(stocks.slice(0,10),i=>`<td class="num">${fmt(i.px*1.002,2)}</td>`).replace(/<\/tr>/g,'</tr>'));
+$('#tLow').innerHTML=T(['Symbol','#LTP','#52W Low','#Chg%'],
+ stkRows(stocks.slice(-10),i=>`<td class="num">${fmt(i.px*0.997,2)}</td>`));
+
+(function(){
+  const adv=1428,dec=1092,unc=118,t=adv+dec+unc;
+  $('#breadth').innerHTML=`
+   <div class="rowflex" style="margin-bottom:12px">
+     <div class="stat"><div class="l">Advances</div><div class="v up">${adv}</div></div>
+     <div class="stat"><div class="l">Declines</div><div class="v dn">${dec}</div></div>
+     <div class="stat"><div class="l">Unchanged</div><div class="v fl">${unc}</div></div>
+     <div class="stat"><div class="l">A/D Ratio</div><div class="v" style="color:var(--gold)">${(adv/dec).toFixed(2)}</div></div>
+   </div>
+   <div class="bar-out" style="height:11px;display:flex">
+     <div class="bar-in" style="width:${adv/t*100}%;background:var(--grn)"></div>
+     <div class="bar-in" style="width:${unc/t*100}%;background:#4a5a72"></div>
+     <div class="bar-in" style="width:${dec/t*100}%;background:var(--red)"></div>
+   </div>
+   <div class="tblwrap" style="margin-top:14px"><table>${T(['Metric','#Value','#Prev'],
+    [['Stocks at 52W High','142','128'],['Stocks at 52W Low','86','94'],
+     ['Upper Circuit','214','188'],['Lower Circuit','132','156'],
+     ['NSE Cash Turnover (₹Cr)','1,08,420','96,180'],
+     ['NSE F&O Turnover (₹Cr)','3,84,20,100','3,42,18,600'],
+     ['Put/Call Ratio (NIFTY)','0.94','1.02']]
+    .map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td><td class="num tiny">${r[2]}</td></tr>`).join(''))}</table></div>`;
+})();
+
+$('#tVal').innerHTML=T(['Index','#P/E','#P/B','#Div Yield %','#EPS'],
+ [['NIFTY 50',22.4,3.82,1.24,1108],['NIFTY NEXT 50',26.8,4.12,1.02,2542],
+  ['NIFTY MIDCAP 100',34.6,4.98,0.78,1682],['NIFTY SMALLCAP 100',31.2,4.10,0.68,590],
+  ['NIFTY BANK',15.8,2.64,0.92,3494],['NIFTY IT',30.2,8.42,2.18,1396],
+  ['SENSEX',23.1,3.94,1.18,3524]]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td class="num">${r[1]}</td><td class="num">${r[2]}</td>
+  <td class="num">${r[3]}</td><td class="num">${fmt(r[4],0)}</td></tr>`).join(''));
+
+$('#tBulk').innerHTML=T(['Date','Symbol','Client','Type','#Qty','#Avg Price','Exch'],
+ [[0,'IREDA','Quant Mutual Fund','BUY',2840000,192.4,'NSE'],
+  [0,'SUZLON','Morgan Stanley Asia','SELL',9120000,62.8,'BSE'],
+  [0,'YESBANK','Societe Generale','BUY',18400000,19.7,'NSE'],
+  [1,'DIXON','SBI Mutual Fund','BUY',148000,15380,'NSE'],
+  [1,'PNB','Goldman Sachs (Singapore)','SELL',6240000,102.9,'NSE'],
+  [2,'JIOFIN','ICICI Pru AMC','BUY',3120000,297.6,'BSE'],
+  [2,'TRENT','Nippon India MF','SELL',82000,6438,'NSE']]
+ .map(r=>`<tr><td>${dstr(D(-r[0]))}</td><td class="sym">${r[1]}</td><td>${r[2]}</td>
+  <td><span class="pill ${r[3]==='BUY'?'g':'r'}">${r[3]}</span></td>
+  <td class="num">${fmt(r[4],0)}</td><td class="num">${fmt(r[5],2)}</td><td class="tiny">${r[6]}</td></tr>`).join(''));
+
+/* ---------- GLOBAL ---------- */
+$('#tGlobal').innerHTML=T(['','Index','Region','#Last','#Change','#Chg%','#CY %'],
+ GLOB.map(g=>{const i=INST['G_'+g[0]];
+  return `<tr><td style="font-size:16px">${g[3]}</td><td class="sym">${g[1]}</td>
+   <td><span class="pill m">${g[4]}</span></td>
+   <td class="num" data-p="G_${g[0]}"></td>
+   <td class="num" data-c="G_${g[0]}"></td>
+   <td class="num" data-c="G_${g[0]}" data-mode="pct"></td>
+   <td class="num ${cls(rnd(-6,26))}">${sgn(rnd(-6,26))}%</td></tr>`;}).join(''));
+
+$('#tAdr').innerHTML=T(['Instrument','Listing','#Price','#Chg%','#Premium/Disc to India'],
+ [['Infosys ADR','NYSE: INFY','$22.84',0.86,'+1.2%'],['Wipro ADR','NYSE: WIT','$3.42',-0.42,'-0.4%'],
+  ['HDFC Bank ADR','NYSE: HDB','$62.18',1.12,'+0.9%'],['ICICI Bank ADR','NYSE: IBN','$30.42',0.68,'+0.6%'],
+  ['iShares MSCI India ETF','NYSE: INDA','$52.18',0.34,'—'],
+  ['WisdomTree India Earnings','NYSE: EPI','$44.62',0.28,'—'],
+  ['GIFT NIFTY (NSE IX)','GIFT City','24,868',0.22,'+55 pts vs spot']]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td class="tiny">${r[1]}</td><td class="num">${r[2]}</td>
+  <td class="num ${cls(r[3])}">${sgn(r[3])}%</td><td class="num tiny">${r[4]}</td></tr>`).join(''));
+
+/* ---------- COMMODITIES ---------- */
+$('#tMcx').innerHTML=T(['Contract','Expiry','#LTP','#Chg%','#High','#Low','#OI','Lot'],
+ MCXC.map(c=>{const i=INST['M_'+c[0]];
+  return `<tr><td class="sym">${c[1]}<div class="tiny">${c[4]}</div></td>
+   <td class="tiny">${dstr(D(rnd(12,60)|0))}</td>
+   <td class="num" data-p="M_${c[0]}"></td>
+   <td class="num" data-c="M_${c[0]}" data-mode="pct"></td>
+   <td class="num tiny">${fmt(c[2]*1.008,2)}</td><td class="num tiny">${fmt(c[2]*0.992,2)}</td>
+   <td class="num tiny">${fmt(rnd(2000,42000),0)}</td><td class="tiny">${c[5]}</td></tr>`;}).join(''));
+
+$('#tIntl').innerHTML=T(['Benchmark','Exchange','#Last','#Chg%','Unit'],
+ [['XAU','COMEX','$/oz'],['XAG','COMEX','$/oz'],['BRENT','ICE','$/bbl'],
+  ['WTI','NYMEX','$/bbl'],['LMECU','LME','$/t'],['NGUS','NYMEX','$/mmBtu']]
+ .map(r=>`<tr><td class="sym">${INST[r[0]].name}</td><td class="tiny">${r[1]}</td>
+  <td class="num" data-p="${r[0]}"></td><td class="num" data-c="${r[0]}" data-mode="pct"></td>
+  <td class="tiny">${r[2]}</td></tr>`).join(''));
+
+$('#tAgri').innerHTML=T(['Commodity','#LTP ₹','#Chg%','#Volume','Unit'],
+ [['Guar Seed',5142,0.82,18420,'₹/qtl'],['Guar Gum',10480,1.24,9240,'₹/qtl'],
+  ['Jeera (Cumin)',21480,-0.62,12480,'₹/qtl'],['Dhaniya',7420,0.44,6280,'₹/qtl'],
+  ['Turmeric',13860,2.18,15240,'₹/qtl'],['Castor Seed',6284,-0.34,8120,'₹/qtl'],
+  ['Soybean',4642,0.92,11480,'₹/qtl'],['Mustard Seed',6182,0.28,9840,'₹/qtl'],
+  ['Cotton Candy',56420,-0.48,3240,'₹/candy'],['Barley',2384,0.66,4180,'₹/qtl']]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td class="num">${fmt(r[1],0)}</td>
+  <td class="num ${cls(r[2])}">${sgn(r[2])}%</td><td class="num tiny">${fmt(r[3],0)}</td>
+  <td class="tiny">${r[4]}</td></tr>`).join(''));
+
+/* ---------- GOLD ---------- */
+$('#tCity').innerHTML=T(['City','#22K / 10g','#24K / 10g','#Silver / kg','#Chg'],
+ [['Mumbai',71340,77820,92100,0.42],['Delhi',71490,77970,92250,0.44],
+  ['Chennai',71820,78360,97400,0.38],['Kolkata',71340,77820,92100,0.40],
+  ['Bengaluru',71390,77880,92150,0.41],['Hyderabad',71340,77820,97400,0.39],
+  ['Ahmedabad',71390,77870,92200,0.43],['Pune',71340,77820,92100,0.42],
+  ['Jaipur',71490,77970,92250,0.45],['Kochi',71820,78360,97400,0.37]]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td class="num">${fmt(r[1],0)}</td>
+  <td class="num">${fmt(r[2],0)}</td><td class="num">${fmt(r[3],0)}</td>
+  <td class="num ${cls(r[4])}">${sgn(r[4])}%</td></tr>`).join(''));
+
+$('#tGetf').innerHTML=T(['ETF','Symbol','#NAV','#Mkt Price','#Chg%','#Exp Ratio','#AUM ₹Cr'],
+ [['Nippon India ETF Gold BeES','GOLDBEES',68.42,68.55,0.48,0.82,14280],
+  ['HDFC Gold ETF','HDFCGOLD',71.28,71.40,0.46,0.59,5420],
+  ['SBI Gold ETF','SETFGOLD',72.14,72.30,0.44,0.65,6180],
+  ['ICICI Pru Gold ETF','GOLDIETF',70.86,70.98,0.47,0.50,4920],
+  ['Kotak Gold ETF','KOTAKGOLD',69.42,69.52,0.45,0.55,3840],
+  ['Nippon Silver ETF','SILVERBEES',96.24,96.48,0.92,0.56,4180],
+  ['ICICI Pru Silver ETF','SILVERIETF',94.86,95.02,0.88,0.40,2940],
+  ['UTI Gold ETF','GOLDSHARE',69.18,69.30,0.43,0.48,1280]]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td class="tiny">${r[1]}</td><td class="num">${fmt(r[2],2)}</td>
+  <td class="num">${fmt(r[3],2)}</td><td class="num up">+${r[4]}%</td>
+  <td class="num">${r[5]}%</td><td class="num">${fmt(r[6],0)}</td></tr>`).join(''));
+
+$('#tSgb').innerHTML=T(['Series','Maturity','#Issue Price','#Mkt Price','#Prem/Disc','#Yield to Mat'],
+ [['SGBAUG28','Aug 2028',5334,7420,-2.6,9.4],['SGBDEC2510','Dec 2025',5000,7680,-1.1,10.2],
+  ['SGBMAR29','Mar 2029',5561,7380,-3.2,8.8],['SGBJUN29','Jun 2029',5926,7340,-3.8,8.4],
+  ['SGBSEP27','Sep 2027',5147,7510,-1.8,9.8],['SGBFEB32','Feb 2032',5109,7180,-5.4,7.9],
+  ['SGBDEC30','Dec 2030',5409,7260,-4.6,8.2]]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td>${r[1]}</td><td class="num">${fmt(r[2],0)}</td>
+  <td class="num">${fmt(r[3],0)}</td><td class="num dn">${r[4]}%</td>
+  <td class="num up">${r[5]}%</td></tr>`).join(''));
+
+/* ---------- BONDS ---------- */
+$('#tSov').innerHTML=T(['','Country','Tenor','#Yield %','#1D Chg','#1M Chg','#1Y Chg','Rating'],
+ BONDS.map(b=>{const i=INST['B_'+b[0]];
+  return `<tr><td style="font-size:16px">${b[3]}</td><td class="sym">${b[4]}</td>
+   <td>${b[1].replace(b[4],'').trim()}</td>
+   <td class="num" data-p="B_${b[0]}" data-dec="3"></td>
+   <td class="num" data-c="B_${b[0]}" data-mode="pct"></td>
+   <td class="num ${cls(rnd(-25,25))}">${sgn(rnd(-25,25))} bps</td>
+   <td class="num ${cls(rnd(-80,80))}">${sgn(rnd(-80,80))} bps</td>
+   <td><span class="pill m">${({India:'BBB-',"United States":'AA+',"United Kingdom":'AA',Germany:'AAA',France:'AA-',Italy:'BBB',Japan:'A+',China:'A+',Australia:'AAA',Canada:'AAA',Brazil:'BB',"South Africa":'BB-',"South Korea":'AA',Indonesia:'BBB',Mexico:'BBB'})[b[4]]||'—'}</span></td></tr>`;}).join(''));
+
+$('#tGsec').innerHTML=T(['Security','Type','#Coupon','#Maturity','#Price','#YTM %','#Vol ₹Cr'],
+ [['7.10% GS 2034','Dated G-Sec',7.10,'2034',102.84,6.712,18420],
+  ['7.18% GS 2033','Dated G-Sec',7.18,'2033',103.42,6.658,12480],
+  ['7.30% GS 2053','Dated G-Sec',7.30,'2053',104.18,7.045,6240],
+  ['7.06% GS 2028','Dated G-Sec',7.06,'2028',101.92,6.585,9840],
+  ['364-Day T-Bill','T-Bill',0,'Jan 2026',93.84,6.548,4280],
+  ['182-Day T-Bill','T-Bill',0,'Jul 2025',96.82,6.492,3180],
+  ['91-Day T-Bill','T-Bill',0,'Apr 2025',98.42,6.438,5620],
+  ['Maharashtra SDL 2035','State Dev Loan',7.42,'2035',100.62,7.348,840],
+  ['Tamil Nadu SDL 2034','State Dev Loan',7.38,'2034',100.48,7.312,620],
+  ['FRB 2033','Floating Rate',0,'2033',99.84,6.884,410]]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td><span class="pill b">${r[1]}</span></td>
+  <td class="num">${r[2]?r[2]+'%':'—'}</td><td>${r[3]}</td><td class="num">${fmt(r[4],2)}</td>
+  <td class="num" style="color:var(--gold)">${r[5]}</td><td class="num tiny">${fmt(r[6],0)}</td></tr>`).join(''));
+
+$('#tCorp').innerHTML=T(['Issuer','Rating','#Coupon','#Maturity','#YTM %','#Spread vs G-Sec','#Face Value'],
+ [['REC Ltd','AAA (CRISIL)',7.42,'2031',7.38,'+67 bps',1000],
+  ['Power Finance Corp','AAA (ICRA)',7.48,'2033',7.44,'+73 bps',1000],
+  ['NABARD','AAA (CRISIL)',7.28,'2030',7.24,'+53 bps',1000],
+  ['HDFC Bank','AAA (CARE)',7.62,'2032',7.56,'+85 bps',1000],
+  ['L&T Finance','AAA (India Ra)',8.12,'2029',8.02,'+131 bps',1000],
+  ['Muthoot Finance','AA+ (CRISIL)',9.18,'2028',9.04,'+233 bps',1000],
+  ['Shriram Finance','AA+ (ICRA)',9.42,'2029',9.28,'+257 bps',1000],
+  ['IIFL Finance','AA (CRISIL)',10.24,'2027',10.10,'+339 bps',1000],
+  ['Navi Finserv','A (CRISIL)',11.20,'2027',11.02,'+431 bps',1000],
+  ['UGRO Capital','A- (India Ra)',12.10,'2028',11.85,'+514 bps',1000]]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td><span class="pill ${r[1][0]==='A'&&r[1].startsWith('AAA')?'g':'y'}">${r[1]}</span></td>
+  <td class="num">${r[2]}%</td><td>${r[3]}</td><td class="num" style="color:var(--gold)">${r[4]}%</td>
+  <td class="num tiny">${r[5]}</td><td class="num tiny">₹${fmt(r[6],0)}</td></tr>`).join(''));
+
+$('#tDebtF').innerHTML=T(['Fund / ETF','Category','#NAV','#1Y %','#3Y %','#YTM','#Avg Mat','#Exp'],
+ [['Bharat Bond ETF 2033','Target Maturity',1284.20,8.42,6.84,7.28,'8.1y',0.0005],
+  ['Nippon India Nivesh Lakshya','Long Duration',18.42,9.12,6.28,7.12,'22.4y',0.31],
+  ['SBI Magnum Gilt Fund','Gilt',68.24,8.86,6.92,6.98,'12.8y',0.46],
+  ['ICICI Pru All Seasons Bond','Dynamic Bond',36.84,9.24,7.42,7.68,'6.2y',0.58],
+  ['HDFC Corporate Bond Fund','Corporate Bond',32.18,8.62,6.88,7.42,'4.8y',0.36],
+  ['Aditya Birla SL Money Manager','Money Market',348.62,7.84,6.72,7.34,'0.5y',0.21],
+  ['Kotak Banking & PSU Debt','Banking & PSU',62.48,8.34,6.68,7.38,'4.2y',0.38],
+  ['Axis Ultra Short Duration','Ultra Short',13.84,7.62,6.54,7.28,'0.4y',0.29],
+  ['UTI Liquid Fund','Liquid',4128.40,7.28,6.42,6.94,'0.1y',0.16],
+  ['Edelweiss CRISIL PSU+SDL 2027','Target Maturity',12.84,8.18,6.74,7.18,'2.4y',0.18]]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td><span class="pill b">${r[1]}</span></td>
+  <td class="num">${fmt(r[2],2)}</td><td class="num up">${r[3]}</td><td class="num up">${r[4]}</td>
+  <td class="num">${r[5]}%</td><td class="num tiny">${r[6]}</td><td class="num tiny">${r[7]}%</td></tr>`).join(''));
+
+/* ---------- MUTUAL FUNDS ---------- */
+const MF=[
+ ['Nippon India Small Cap','small',178.42,-0.62,32.4,28.6,34.2,4.8,'★★★★★',62480,0.68,'Very High'],
+ ['Quant Small Cap','small',268.18,-0.84,28.6,26.4,42.8,5.2,'★★★★★',26840,0.70,'Very High'],
+ ['HDFC Mid-Cap Opportunities','mid',186.24,-0.34,28.2,26.8,29.4,4.2,'★★★★★',78420,0.76,'Very High'],
+ ['Motilal Oswal Midcap','mid',108.62,-0.48,34.8,31.2,32.6,4.9,'★★★★★',26180,0.66,'Very High'],
+ ['Parag Parikh Flexi Cap','flexi',82.46,0.28,24.8,20.4,24.8,3.4,'★★★★★',88240,0.63,'Very High'],
+ ['HDFC Flexi Cap','flexi',1948.20,0.14,26.4,22.8,25.6,3.8,'★★★★★',64820,0.78,'Very High'],
+ ['ICICI Pru Bluechip','large',108.84,0.22,22.4,18.2,19.8,3.2,'★★★★★',62480,0.87,'Very High'],
+ ['Nippon India Large Cap','large',88.42,0.18,23.8,19.4,20.6,3.4,'★★★★★',34280,0.68,'Very High'],
+ ['Mirae Asset Large Cap','large',102.28,0.16,18.4,14.8,16.2,2.8,'★★★★☆',38240,0.55,'Very High'],
+ ['SBI Contra Fund','flexi',368.42,-0.12,26.8,24.2,28.4,4.4,'★★★★★',42180,0.60,'Very High'],
+ ['Quant ELSS Tax Saver','elss',412.84,-0.72,24.6,22.8,32.4,4.6,'★★★★☆',11240,0.77,'Very High'],
+ ['Mirae Asset ELSS Tax Saver','elss',48.62,0.08,20.2,16.4,19.2,3.1,'★★★★☆',25480,0.61,'Very High'],
+ ['Bandhan ELSS Tax Saver','elss',162.48,-0.18,22.8,18.6,22.4,3.6,'★★★★☆',6840,0.65,'Very High'],
+ ['UTI Nifty 50 Index','index',162.28,0.24,18.2,14.2,15.8,2.6,'★★★★☆',22840,0.20,'Very High'],
+ ['ICICI Pru Nifty Next 50 Index','index',68.42,-0.14,26.4,20.8,22.6,3.8,'★★★★☆',7280,0.30,'Very High'],
+ ['Motilal Oswal Nasdaq 100 FoF','index',38.84,0.68,28.4,16.8,22.4,3.2,'★★★★☆',5180,0.58,'Very High'],
+ ['HDFC Balanced Advantage','hyb',512.42,0.18,22.8,19.2,20.4,2.4,'★★★★★',96480,0.75,'High'],
+ ['ICICI Pru Equity & Debt','hyb',382.64,0.22,24.2,20.8,22.6,2.6,'★★★★★',42180,0.98,'High'],
+ ['SBI Equity Hybrid','hyb',288.42,0.14,16.8,13.4,15.2,2.1,'★★★★☆',72480,0.72,'High'],
+ ['Kotak Emerging Equity','mid',132.84,-0.28,24.6,21.4,26.8,4.0,'★★★★☆',52180,0.42,'Very High'],
+ ['Axis Small Cap','small',108.28,-0.54,24.8,22.6,30.4,4.4,'★★★★☆',24280,0.55,'Very High'],
+ ['Tata Digital India','flexi',48.62,0.84,26.2,12.8,24.6,4.8,'★★★☆☆',11840,0.34,'Very High'],
+ ['Nippon India Growth','mid',3842.20,-0.32,26.8,24.4,28.2,4.1,'★★★★★',34280,0.79,'Very High'],
+ ['Canara Robeco Small Cap','small',38.42,-0.66,22.4,20.8,31.2,4.6,'★★★★☆',12480,0.48,'Very High'],
+ ['JM Flexicap','flexi',108.62,-0.08,32.8,26.4,28.8,4.2,'★★★★★',5240,0.44,'Very High'],
+ ['Invesco India Infrastructure','flexi',68.84,-0.42,32.4,28.8,32.6,5.1,'★★★★☆',1640,0.72,'Very High'],
+];
+const MFCATS={all:'All Categories',large:'Large Cap',mid:'Mid Cap',small:'Small Cap',
+ flexi:'Flexi / Multi Cap',elss:'ELSS (80C)',index:'Index / ETF',hyb:'Hybrid'};
+$('#mfPanes').innerHTML=Object.keys(MFCATS).map(k=>{
+  const list=(k==='all'?MF:MF.filter(m=>m[1]===k)).slice().sort((a,b)=>b[6]-a[6]);
+  return `<div class="tabpane ${k==='all'?'on':''}" id="mf-${k}"><div class="card">
+   <h3>${MFCATS[k]} — Ranked by 3Y CAGR <span class="tag src">AMFI NAV</span><span class="tag">SAMPLE</span></h3>
+   <div class="tblwrap"><table>${T(['#','Scheme (Direct · Growth)','Cat','#NAV ₹','#1D %','#1Y %','#3Y CAGR','#5Y CAGR','#Sharpe','Rating','#AUM ₹Cr','#Expense','Risk'],
+    list.map((m,ix)=>`<tr>
+      <td class="tiny">${ix+1}</td>
+      <td class="sym">${m[0]}</td>
+      <td><span class="pill p">${MFCATS[m[1]].split(' ')[0]}</span></td>
+      <td class="num">${fmt(m[2],2)}</td>
+      <td class="num ${cls(m[3])}">${sgn(m[3])}</td>
+      <td class="num up">${m[4]}</td>
+      <td class="num up"><b>${m[5]}</b></td>
+      <td class="num up">${m[6]}</td>
+      <td class="num">${m[7]}</td>
+      <td style="color:var(--gold)">${m[8]}</td>
+      <td class="num">${fmt(m[9],0)}</td>
+      <td class="num tiny">${m[10]}%</td>
+      <td class="tiny">${m[11]}</td></tr>`).join(''))}</table></div>
+   <div class="dis">Returns are CAGR for periods &gt;1Y, absolute for 1Y. Direct-plan Growth option. Sharpe computed on 3Y monthly rolling vs 6.5% risk-free.</div>
+  </div></div>`;}).join('');
+
+$('#mfTop').innerHTML=[
+ ['Industry AUM','₹68.4 L Cr','+22.4% YoY','g'],
+ ['Monthly SIP Inflow','₹26,480 Cr','All-time high','g'],
+ ['Active SIP Accounts','10.4 Cr','+18.2% YoY','b'],
+ ['Equity Net Inflow (M)','₹41,280 Cr','+8.6% MoM','g']
+].map(s=>`<div class="tile"><div class="nm">${s[0]}</div><div class="px" style="font-size:17px">${s[1]}</div>
+ <div class="ch"><span class="pill ${s[3]}">${s[2]}</span></div></div>`).join('');
+
+/* ---------- FX / CRYPTO ---------- */
+$('#tFx').innerHTML=T(['Pair','#Rate','#Chg%','#Day High','#Day Low','#YTD %'],
+ ['USDINR','EURINR','GBPINR','JPYINR','DXY'].map(id=>{const i=INST[id];
+  return `<tr><td class="sym">${i.name}</td><td class="num" data-p="${id}" data-dec="4"></td>
+   <td class="num" data-c="${id}" data-mode="pct"></td>
+   <td class="num tiny">${fmt(i.base*1.004,4)}</td><td class="num tiny">${fmt(i.base*0.996,4)}</td>
+   <td class="num ${cls(rnd(-4,4))}">${sgn(rnd(-4,4))}%</td></tr>`;}).join(''));
+$('#tCrypto').innerHTML=T(['Asset','#Price USD','#Chg%','#Price INR','#Mkt Cap','#Dominance'],
+ [['BTC',96420,1856000,'$1.91T','56.4%'],['ETH',3312,285000,'$399B','11.8%']]
+ .map(r=>`<tr><td class="sym">${INST[r[0]].name}</td><td class="num" data-p="${r[0]}" data-dec="0"></td>
+  <td class="num" data-c="${r[0]}" data-mode="pct"></td><td class="num">₹${fmt(r[2],0)}</td>
+  <td class="num">${r[3]}</td><td class="num">${r[4]}</td></tr>`).join(''));
+
+/* ==========================================================================
+   IPO MODULE
+   ========================================================================== */
+const IPOS=[
+ {n:'Meridian Renewables Ltd',st:'open',band:'₹412 – ₹434',lot:34,size:'₹4,820 Cr',
+  fresh:'₹3,200 Cr',ofs:'₹1,620 Cr',open:-1,close:2,alot:3,listd:5,gmp:96,gmpT:[42,58,64,72,81,88,96],
+  sub:{qib:8.42,nii:14.62,rii:6.28,emp:3.14,tot:9.86},lead:'Kotak Mahindra Cap, Axis Cap, JM Financial',
+  reg:'Link Intime India',exch:'NSE, BSE',face:10,
+  seg:[['Solar EPC',42],['Wind O&M',24],['Battery Storage',18],['Green Hydrogen',9],['Others',7]],
+  fin:[['FY23',3842,286,7.4,18.2],['FY24',5124,468,9.1,22.6],['FY25',6980,742,10.6,26.4],['H1FY26',4180,486,11.6,28.1]],
+  peers:[['Meridian Renewables (IPO)',434,32.4,26.4,18.6,'—'],['Suzlon Energy',62.4,48.2,19.4,14.2,'₹85,200 Cr'],
+   ['Inox Wind',182.6,64.8,12.8,11.4,'₹23,800 Cr'],['KPI Green Energy',742,42.6,28.2,16.8,'₹9,400 Cr'],
+   ['Waaree Energies',2840,38.4,31.6,14.2,'₹81,600 Cr']],
+  str:['Order book of ₹18,400 Cr — 2.6× FY25 revenue, giving ~30 months of visibility',
+   'EBITDA margin expanded 320 bps over 3 years on captive module sourcing',
+   'Net debt/EBITDA at 1.2× vs peer median 2.8×',
+   'Beneficiary of PLI + ALMM policy tailwinds and 500 GW non-fossil target'],
+  rsk:['Top-5 customers = 58% of revenue — high concentration risk',
+   'Receivable days at 118 vs industry 82; working-capital intensive',
+   '₹1,620 Cr OFS means promoter stake drops 74% → 58%',
+   'Priced at 32× FY25 P/E vs 3-year sector median of 24×',
+   'Merchant power exposure of 14% is unhedged against tariff swings'],
+  val:'At the upper band of ₹434 the issue is valued at 32.4× FY25 EPS and 4.8× P/B, a premium to the listed renewable-EPC median of ~26×. The premium is partly justified by superior ROCE (26.4% vs 18% median) and lower leverage, but leaves limited margin of safety if order inflow slows.'},
+
+ {n:'Anandvan Speciality Chemicals',st:'open',band:'₹268 – ₹282',lot:53,size:'₹1,840 Cr',
+  fresh:'₹1,200 Cr',ofs:'₹640 Cr',open:0,close:3,alot:4,listd:6,gmp:34,gmpT:[18,22,26,28,31,33,34],
+  sub:{qib:3.18,nii:5.42,rii:4.86,emp:2.12,tot:4.24},lead:'ICICI Securities, HSBC, Nuvama',
+  reg:'KFin Technologies',exch:'NSE, BSE',face:2,
+  seg:[['Agrochemical Intermediates',38],['Pharma Intermediates',31],['Performance Chemicals',21],['Custom Synthesis',10]],
+  fin:[['FY23',1842,168,9.1,16.2],['FY24',2148,214,10.0,17.8],['FY25',2680,296,11.0,19.4],['H1FY26',1520,178,11.7,20.2]],
+  peers:[['Anandvan Speciality (IPO)',282,28.6,19.4,16.8,'—'],['Aarti Industries',428,34.2,11.2,9.4,'₹15,500 Cr'],
+   ['Navin Fluorine',3820,58.4,14.6,11.8,'₹18,900 Cr'],['Vinati Organics',1780,46.2,18.4,15.2,'₹18,400 Cr'],
+   ['Deepak Nitrite',2240,32.8,22.6,18.4,'₹30,500 Cr']],
+  str:['China+1 driven export share up from 34% to 52% in 3 years',
+   'Two US-FDA and one EDQM approved blocks — high entry barrier',
+   'Long-term contracts covering 61% of FY26 capacity'],
+  rsk:['Raw-material (KSM) imports still 44% China-sourced',
+   'Agrochemical demand cyclicality; global inventory destocking risk',
+   'New Dahej plant commissioning delayed by 2 quarters'],
+  val:'Priced at 28.6× FY25 earnings, in line with mid-cap speciality chemical peers but at a discount to premium names like Navin Fluorine. Reasonable if the Dahej ramp-up delivers the guided 22% revenue CAGR.'},
+
+ {n:'Sarathi Logistics & Warehousing',st:'up',band:'₹186 – ₹196 (indicative)',lot:76,size:'₹2,420 Cr',
+  fresh:'₹1,800 Cr',ofs:'₹620 Cr',open:6,close:9,alot:10,listd:12,gmp:22,gmpT:[8,11,14,16,19,21,22],
+  sub:null,lead:'SBI Capital, IIFL Capital',reg:'Link Intime India',exch:'NSE, BSE',face:10,
+  seg:[['Grade-A Warehousing',46],['3PL & Contract Logistics',28],['Cold Chain',16],['Freight Forwarding',10]],
+  fin:[['FY23',2420,118,4.9,11.2],['FY24',3180,196,6.2,13.4],['FY25',4240,312,7.4,15.8],['H1FY26',2480,204,8.2,16.4]],
+  peers:[['Sarathi Logistics (IPO)',196,26.8,15.8,12.4,'—'],['Delhivery',382,-,-2.4,-1.8,'₹28,400 Cr'],
+   ['TCI Express',742,28.4,18.2,16.4,'₹2,850 Cr'],['Mahindra Logistics',428,-,3.2,2.1,'₹3,080 Cr'],
+   ['Container Corp',742,32.6,11.4,9.8,'₹45,200 Cr']],
+  str:['32 mn sq ft Grade-A warehousing pipeline near NCR, Pune, Chennai corridors',
+   'GST + dedicated freight corridor structurally shrinking transit times',
+   'Anchor tenants include 3 large e-commerce and 2 auto OEM clients on 9-year leases'],
+  rsk:['Capex-heavy model; ₹1,800 Cr fresh issue largely funds land acquisition',
+   'Lease-rental yields compressing as institutional capital floods warehousing',
+   'Fuel and driver-cost inflation directly hits the 3PL margin'],
+  val:'Indicative pricing at ~26.8× FY25 earnings looks full for an asset-heavy logistics play. Watch the final RHP price band and anchor-book quality before applying.'},
+
+ {n:'Kaveri Health Systems',st:'up',band:'₹640 – ₹672 (indicative)',lot:22,size:'₹3,150 Cr',
+  fresh:'₹900 Cr',ofs:'₹2,250 Cr',open:9,close:12,alot:13,listd:15,gmp:118,gmpT:[62,74,86,94,104,112,118],
+  sub:null,lead:'Morgan Stanley India, Jefferies, Kotak',reg:'KFin Technologies',exch:'NSE, BSE',face:5,
+  seg:[['Multi-speciality Hospitals',58],['Diagnostics Chain',22],['Home Healthcare',11],['Pharmacy Retail',9]],
+  fin:[['FY23',3480,286,8.2,12.4],['FY24',4180,428,10.2,15.2],['FY25',5240,624,11.9,18.6],['H1FY26',3040,392,12.9,19.8]],
+  peers:[['Kaveri Health (IPO)',672,42.8,18.6,14.2,'—'],['Apollo Hospitals',6840,72.4,14.8,10.6,'₹98,400 Cr'],
+   ['Max Healthcare',1082,68.2,16.4,13.8,'₹1,05,000 Cr'],['Fortis Healthcare',642,58.6,11.2,9.4,'₹48,600 Cr'],
+   ['Narayana Hrudayalaya',1284,34.2,26.8,21.4,'₹26,200 Cr']],
+  str:['ARPOB up 18% CAGR; occupancy at 71% with 1,400 beds under construction',
+   'Diagnostics arm growing 26% with 38% EBITDA margin — high-multiple business',
+   'Enters at a discount to Apollo/Max on EV/EBITDA'],
+  rsk:['₹2,250 Cr OFS = 71% of issue; PE investor exiting, no fresh capital for most of the raise',
+   'Regulatory price caps on stents/implants and NPPA action risk',
+   'Doctor-attrition and clinical-talent cost inflation'],
+  val:'At 42.8× FY25 EPS and ~21× EV/EBITDA the issue prices in flawless execution, though it is still cheaper than Apollo and Max on both metrics. The large OFS component is the key negative.'},
+
+ {n:'Trilok Fintech Solutions',st:'up',band:'TBA',lot:'TBA',size:'₹1,100 Cr (DRHP filed)',
+  fresh:'₹800 Cr',ofs:'₹300 Cr',open:20,close:23,alot:24,listd:26,gmp:0,gmpT:[0,0,0,0,0,0,0],
+  sub:null,lead:'Nuvama, DAM Capital',reg:'Bigshare Services',exch:'NSE, BSE',face:10,
+  seg:[['Merchant Payments',44],['Lending-as-a-Service',29],['Wealth Platform',17],['SaaS Licensing',10]],
+  fin:[['FY23',482,-68,-14.1,-9.2],['FY24',684,12,1.8,1.4],['FY25',1024,96,9.4,11.2],['H1FY26',640,74,11.6,12.8]],
+  peers:[['Trilok Fintech (IPO)','TBA','—',11.2,8.4,'—'],['Paytm (One97)',962,'—',-2.1,-1.6,'₹61,200 Cr'],
+   ['PB Fintech',1842,182.4,4.2,3.8,'₹84,600 Cr'],['CDSL',1720,68.4,32.4,28.6,'₹35,900 Cr'],
+   ['BSE Ltd',5420,58.2,24.8,21.2,'₹73,400 Cr']],
+  str:['Turned PAT-positive in FY24 and scaled profitably since','GMV growing 42% with take-rate stable at 0.68%'],
+  rsk:['DRHP stage only — SEBI observations pending, terms may change materially',
+   'RBI regulatory overhang on digital lending and payment-aggregator licences'],
+  val:'Too early to assess — no price band. Track SEBI observation letter and the RHP for final valuation.'},
+];
+const LISTED=[
+ ['Vaayu Aerospace Systems',-18,486,742,52.7,880,81.1,'₹2,840 Cr','Defence'],
+ ['Nandi Consumer Brands',-25,312,368,17.9,341,9.3,'₹1,120 Cr','FMCG'],
+ ['Ratnagiri Port Infra',-32,148,132,-10.8,119,-19.6,'₹960 Cr','Infra'],
+ ['Skyline Data Centres',-41,824,1148,39.3,1382,67.7,'₹4,200 Cr','Tech'],
+ ['Ambuj Bearings Ltd',-54,196,208,6.1,182,-7.1,'₹640 Cr','Auto Anc'],
+ ['Deccan Pharma Labs',-68,542,498,-8.1,612,12.9,'₹1,480 Cr','Pharma'],
+ ['Ganga Textile Mills',-82,84,79,-6.0,68,-19.0,'₹380 Cr','Textile'],
+ ['Vidyut Power Grid Co',-96,268,342,27.6,398,48.5,'₹3,100 Cr','Power'],
+];
+const SMEIPO=[
+ ['Krishna Auto Components',-2,3,142,'₹18.4 Cr',1.14,42,'NSE Emerge'],
+ ['Vertex Precision Tools',1,4,96,'₹12.8 Cr','—',18,'BSE SME'],
+ ['Sunrise Agro Foods',-6,-3,68,'₹9.6 Cr',86.4,54,'NSE Emerge'],
+ ['Meghna Infra Projects',3,6,124,'₹22.4 Cr','—',26,'BSE SME'],
+];
+
+$('#ipoStats').innerHTML=[
+ ['Open Issues',IPOS.filter(i=>i.st==='open').length,'Accepting bids','g'],
+ ['Upcoming',IPOS.filter(i=>i.st==='up').length,'Next 30 days','b'],
+ ['Avg Listing Gain (CY)','+21.4%','across 68 mainboard IPOs','y'],
+ ['Total Raised (CY)','₹1.42 L Cr','mainboard + SME','p']
+].map(s=>`<div class="tile"><div class="nm">${s[0]}</div><div class="px" style="font-size:20px">${s[1]}</div>
+ <div class="ch"><span class="pill ${s[3]}">${s[2]}</span></div></div>`).join(''));
+
+function ipoCard(ip,ix){
+  const gp=ip.band==='TBA'?null:((ip.gmp/parseFloat(ip.band.split('₹').pop()))*100);
+  return `<div class="ipo" data-ipo="${ix}">
+   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:9px">
+     <b style="font-size:13.6px;line-height:1.35">${ip.n}</b>
+     <span class="pill ${ip.st==='open'?'g':'b'}">${ip.st==='open'?'OPEN':'UPCOMING'}</span></div>
+   <div class="kv"><span>Price Band</span><span>${ip.band}</span></div>
+   <div class="kv"><span>Issue Size</span><span>${ip.size}</span></div>
+   <div class="kv"><span>Lot Size</span><span>${ip.lot}</span></div>
+   <div class="kv"><span>Open → Close</span><span>${dstr(D(ip.open))} → ${dstr(D(ip.close))}</span></div>
+   <div class="kv"><span>Allotment</span><span>${dstr(D(ip.alot))}</span></div>
+   <div class="kv"><span>Listing</span><span>${dstr(D(ip.listd))}</span></div>
+   <div class="kv"><span>GMP <span class="tiny">(unofficial)</span></span>
+     <span class="${ip.gmp>0?'up':'fl'}">${ip.gmp?'₹'+ip.gmp+(gp?` (${gp.toFixed(1)}%)`:''):'—'}</span></div>
+   ${ip.sub?`<div style="margin-top:9px"><div class="tiny" style="display:flex;justify-content:space-between">
+     <span>Total subscription</span><b class="up">${ip.sub.tot}×</b></div>
+     <div class="bar-out"><div class="bar-in" style="width:${Math.min(ip.sub.tot*10,100)}%;background:linear-gradient(90deg,var(--grn),var(--cy))"></div></div>
+     <div class="tiny" style="margin-top:6px;display:flex;gap:9px;flex-wrap:wrap">
+      <span>QIB <b class="up">${ip.sub.qib}×</b></span><span>NII <b class="up">${ip.sub.nii}×</b></span>
+      <span>RII <b class="up">${ip.sub.rii}×</b></span><span>EMP <b class="up">${ip.sub.emp}×</b></span></div></div>`
+    :`<div class="tiny" style="margin-top:9px;color:var(--mut)">Subscription opens ${dstr(D(ip.open))}</div>`}
+   <div style="margin-top:10px"><span class="pill b">View full analysis →</span></div></div>`;
+}
+$('#ipoOpen').innerHTML=IPOS.map((i,x)=>i.st==='open'?ipoCard(i,x):'').join('');
+$('#ipoUp').innerHTML=IPOS.map((i,x)=>i.st==='up'?ipoCard(i,x):'').join('');
+
+$('#tListed').innerHTML=T(['Company','Sector','Listed','#Issue ₹','#Listing ₹','#Listing Gain','#CMP ₹','#Return vs Issue','Issue Size'],
+ LISTED.map(r=>`<tr><td class="sym">${r[0]}</td><td><span class="pill m">${r[8]}</span></td>
+  <td class="tiny">${dstr(D(r[1]))}</td><td class="num">${fmt(r[2],0)}</td><td class="num">${fmt(r[3],0)}</td>
+  <td class="num ${cls(r[4])}">${sgn(r[4])}%</td><td class="num">${fmt(r[5],0)}</td>
+  <td class="num ${cls(r[6])}"><b>${sgn(r[6])}%</b></td><td class="tiny">${r[7]}</td></tr>`).join(''));
+
+$('#tSme').innerHTML=T(['Company','Platform','Open','Close','#Price ₹','Issue Size','#Subscription','#GMP ₹'],
+ SMEIPO.map(r=>`<tr><td class="sym">${r[0]}</td><td><span class="pill y">${r[7]}</span></td>
+  <td class="tiny">${dstr(D(r[1]))}</td><td class="tiny">${dstr(D(r[2]))}</td>
+  <td class="num">${r[3]}</td><td>${r[4]}</td>
+  <td class="num ${r[5]==='—'?'fl':'up'}">${r[5]==='—'?'—':r[5]+'×'}</td>
+  <td class="num up">${r[6]}</td></tr>`).join(''));
+
+let curIPO=0;
+function renderIPO(ix){
+  curIPO=ix; const ip=IPOS[ix];
+  $$('.ipo').forEach(e=>e.classList.toggle('sel',+e.dataset.ipo===ix));
+  const upper=parseFloat(String(ip.band).split('₹').pop())||0;
+  const estList=upper+ip.gmp;
+  $('#ipoDetail').innerHTML=`
+  <h3>🔬 Deep Dive — ${ip.n} <span class="tag">${ip.st==='open'?'ISSUE OPEN':'UPCOMING'}</span><span class="tag">SAMPLE</span></h3>
+  <div class="grid g4" style="margin-bottom:16px">
+    <div class="stat"><div class="l">Price Band</div><div class="v" style="font-size:15px">${ip.band}</div></div>
+    <div class="stat"><div class="l">Grey Market Premium</div><div class="v up">${ip.gmp?'₹'+ip.gmp:'—'}</div></div>
+    <div class="stat"><div class="l">Est. Listing Price</div><div class="v" style="color:var(--gold)">${upper?'₹'+fmt(estList,0):'—'}</div></div>
+    <div class="stat"><div class="l">Implied Listing Gain</div><div class="v up">${upper?'+'+((ip.gmp/upper)*100).toFixed(1)+'%':'—'}</div></div>
+  </div>
+
+  <div class="grid g3">
+    <div class="card" style="background:var(--panel2)">
+      <h3>Issue Structure</h3>
+      <div class="kv"><span>Total Size</span><span>${ip.size}</span></div>
+      <div class="kv"><span>Fresh Issue</span><span>${ip.fresh}</span></div>
+      <div class="kv"><span>Offer for Sale</span><span>${ip.ofs}</span></div>
+      <div class="kv"><span>Face Value</span><span>₹${ip.face}</span></div>
+      <div class="kv"><span>Lot Size</span><span>${ip.lot}</span></div>
+      <div class="kv"><span>Min Retail Investment</span><span>${typeof ip.lot==='number'&&upper?'₹'+fmt(ip.lot*upper,0):'TBA'}</span></div>
+      <div class="kv"><span>Listing At</span><span>${ip.exch}</span></div>
+      <div class="kv"><span>Registrar</span><span style="font-size:11px">${ip.reg}</span></div>
+      <div class="kv"><span>Book Runners</span><span style="font-size:10.5px;text-align:right;max-width:150px">${ip.lead}</span></div>
+    </div>
+    <div class="card" style="background:var(--panel2)">
+      <h3>GMP Trend <span class="tag">last 7 sessions</span></h3>
+      <div class="chartbox sm"><canvas id="cGMP"></canvas></div>
+      <div class="dis" style="margin-top:4px">GMP is quoted by unregulated grey-market dealers, has no regulatory sanction, and can swing 50%+ in a day. SEBI explicitly warns against relying on it.</div>
+    </div>
+    <div class="card" style="background:var(--panel2)">
+      <h3>Revenue by Segment <span class="tag">FY25</span></h3>
+      <div class="chartbox sm"><canvas id="cSeg"></canvas></div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card" style="background:var(--panel2)">
+      <h3>Financial Trajectory <span class="tag">₹ Cr</span></h3>
+      <div class="tblwrap"><table>${T(['Period','#Revenue','#PAT','#PAT Margin %','#ROCE %'],
+        ip.fin.map(f=>`<tr><td class="sym">${f[0]}</td><td class="num">${fmt(f[1],0)}</td>
+         <td class="num ${f[2]<0?'dn':'up'}">${fmt(f[2],0)}</td><td class="num">${f[3]}</td>
+         <td class="num">${f[4]}</td></tr>`).join(''))}</table></div>
+    </div>
+    <div class="card" style="background:var(--panel2)">
+      <h3>Peer / Competitor Comparison <span class="tag">Listed comparables</span></h3>
+      <div class="tblwrap"><table>${T(['Company','#CMP ₹','#P/E','#ROE %','#ROCE %','#Mkt Cap'],
+        ip.peers.map((p,i)=>`<tr style="${i===0?'background:rgba(79,140,255,.10)':''}">
+         <td class="sym">${p[0]}</td><td class="num">${typeof p[1]==='number'?fmt(p[1],0):p[1]}</td>
+         <td class="num">${p[2]}</td><td class="num ${(+p[3])<0?'dn':'up'}">${p[3]}</td>
+         <td class="num ${(+p[4])<0?'dn':''}">${p[4]}</td><td class="num tiny">${p[5]}</td></tr>`).join(''))}</table></div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card" style="background:var(--panel2);border-color:#1e4a35">
+      <h3><span class="pill g">STRENGTHS</span></h3>
+      <ul style="padding-left:18px;font-size:12.4px;line-height:1.9;color:#c9dcd2">${ip.str.map(s=>`<li>${s}</li>`).join('')}</ul>
+    </div>
+    <div class="card" style="background:var(--panel2);border-color:#4a1e22">
+      <h3><span class="pill r">RISK FACTORS</span></h3>
+      <ul style="padding-left:18px;font-size:12.4px;line-height:1.9;color:#e0c9cb">${ip.rsk.map(s=>`<li>${s}</li>`).join('')}</ul>
+    </div>
+  </div>
+
+  <div class="card" style="background:linear-gradient(90deg,rgba(240,185,11,.08),transparent);border-color:rgba(240,185,11,.25)">
+    <h3>Valuation View <span class="tag">Analytical note — not a recommendation</span></h3>
+    <div style="font-size:12.8px;line-height:1.8;color:#dbe6f5">${ip.val}</div>
+    <div class="dis">Always read the RHP risk-factor section, the "Basis for Issue Price" chapter, and the auditor's qualifications before applying. Past IPO performance is no guide to future listing gains.</div>
+  </div>`;
+  drawGMP(ip); drawSeg(ip);
+  $$('.ipo').forEach(e=>e.onclick=()=>renderIPO(+e.dataset.ipo));
+}
+
+/* ==========================================================================
+   CALENDAR MODULE
+   ========================================================================== */
+const EVTYPE={board:['Board Meeting','b'],result:['Results','p'],bonus:['Bonus Issue','y'],
+ split:['Stock Split','o'],div:['Dividend','g'],rights:['Rights Issue','r'],
+ buyback:['Buyback','p'],agm:['AGM/EGM','m']};
+const EVENTS=[
+ [-2,'result','TCS','Q3 FY26 Results + Interim Dividend',null],
+ [-1,'board','HDFCBANK','Board meeting — Q3 results & fund raising',null],
+ [0,'result','RELIANCE','Q3 FY26 Consolidated Results',null],
+ [0,'div','ITC','Interim Dividend ₹6.50/share',1],
+ [1,'board','INFY','Board meeting — Q3 results & buyback consideration',null],
+ [1,'bonus','DIXON','Bonus Issue 1:1 — Record Date',2],
+ [2,'result','ICICIBANK','Q3 FY26 Results',null],
+ [2,'split','POLYCAB','Stock Split ₹10 → ₹2 — Record Date',3],
+ [3,'div','POWERGRID','Interim Dividend ₹4.25/share',4],
+ [3,'board','LT','Board meeting — Q3 results',null],
+ [4,'agm','MARUTI','Extraordinary General Meeting',null],
+ [5,'bonus','BEL','Bonus Issue 2:1 — Record Date',6],
+ [5,'result','SBIN','Q3 FY26 Results',null],
+ [6,'buyback','TCS','Buyback tender — Record Date',7],
+ [7,'div','COALINDIA','Interim Dividend ₹15.75/share',8],
+ [8,'rights','SUZLON','Rights Issue 1:8 @ ₹48 — Record Date',9],
+ [8,'board','TATAMOTORS','Board meeting — demerger update',null],
+ [9,'result','BHARTIARTL','Q3 FY26 Results',null],
+ [10,'split','TRENT','Stock Split ₹1 → ₹0.50 — Record Date',11],
+ [11,'div','HINDUNILVR','Interim Dividend ₹19/share',12],
+ [12,'result','MARUTI','Q3 FY26 Results',null],
+ [12,'bonus','IRFC','Bonus Issue 1:2 — Record Date',13],
+ [13,'board','ADANIENT','Board meeting — fund raising via QIP',null],
+ [14,'agm','NTPC','Annual General Meeting',null],
+ [15,'div','ONGC','Interim Dividend ₹6/share',16],
+ [16,'result','SUNPHARMA','Q3 FY26 Results',null],
+ [17,'buyback','BAJFINANCE','Buyback — Record Date',18],
+ [18,'result','TITAN','Q3 FY26 Results',null],
+ [19,'div','NESTLEIND','Interim Dividend ₹8.50/share',20],
+ [20,'board','WIPRO','Board meeting — Q3 results & bonus consideration',null],
+ [21,'bonus','MAZDOCK','Bonus Issue 1:1 — Record Date',22],
+ [22,'result','ASIANPAINT','Q3 FY26 Results',null],
+ [-4,'result','HCLTECH','Q3 FY26 Results',null],
+ [-6,'div','TCS','Interim Dividend ₹27/share',-5],
+ [-8,'bonus','CDSL','Bonus Issue 1:1 — Record Date',-7],
+];
+let calRef=new Date(), evFilter='all';
+function renderCal(){
+  const y=calRef.getFullYear(), m=calRef.getMonth();
+  $('#calLabel').textContent=calRef.toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+  const first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
+  let h=['S','M','T','W','T','F','S'].map(d=>`<div class="dh">${d}</div>`).join('');
+  for(let i=0;i<first;i++)h+='<div class="day empty"></div>';
+  const today=new Date();
+  for(let d=1;d<=days;d++){
+    const dt=new Date(y,m,d);
+    const evs=EVENTS.filter(e=>{const ed=D(e[0]);
+      return ed.getDate()===d&&ed.getMonth()===m&&ed.getFullYear()===y&&(evFilter==='all'||e[1]===evFilter);});
+    const isT=dt.toDateString()===today.toDateString();
+    h+=`<div class="day ${isT?'today':''}" title="${evs.map(e=>e[2]+': '+e[3]).join('\n')}">
+      <div class="dn">${d}</div>
+      ${evs.slice(0,3).map(e=>`<div class="ev pill ${EVTYPE[e[1]][1]}">${e[2]}</div>`).join('')}
+      ${evs.length>3?`<div class="tiny">+${evs.length-3} more</div>`:''}</div>`;
+  }
+  $('#calGrid').innerHTML=h;
+}
+$('#calPrev').onclick=()=>{calRef.setMonth(calRef.getMonth()-1);renderCal();};
+$('#calNext').onclick=()=>{calRef.setMonth(calRef.getMonth()+1);renderCal();};
+$$('[data-ef]').forEach(b=>b.onclick=()=>{
+  $$('[data-ef]').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  evFilter=b.dataset.ef; renderCal(); renderCA();});
+function renderCA(){
+  const list=EVENTS.filter(e=>e[0]>=0&&(evFilter==='all'||e[1]===evFilter)).sort((a,b)=>a[0]-b[0]);
+  $('#tCA').innerHTML=T(['Symbol','Event Type','Purpose / Ratio','Ex-Date','Record Date','Days'],
+   list.map(e=>`<tr><td class="sym">${e[2]}</td>
+    <td><span class="pill ${EVTYPE[e[1]][1]}">${EVTYPE[e[1]][0]}</span></td>
+    <td>${e[3]}</td>
+    <td>${e[4]!=null?dstr(D(e[4]-1)):'—'}</td>
+    <td><b>${e[4]!=null?dstr(D(e[4])):'—'}</b></td>
+    <td class="tiny">T+${e[0]}</td></tr>`).join(''));
+  $('#tBM').innerHTML=T(['Symbol','Meeting Date','Purpose','Filed On'],
+   EVENTS.filter(e=>e[1]==='board').map(e=>`<tr><td class="sym">${e[2]}</td>
+    <td>${dfull(D(e[0]))}</td><td class="tiny">${e[3]}</td>
+    <td class="tiny">${dstr(D(e[0]-7))}</td></tr>`).join(''));
+}
+
+/* ==========================================================================
+   FILINGS
+   ========================================================================== */
+$('#tAnn').innerHTML=T(['Time','Symbol','Category','Subject','Exch'],
+ [[8,'RELIANCE','Investor Presentation','Q3 FY26 earnings presentation — 42 slides','BSE'],
+  [22,'TCS','Press Release','TCS wins $1.2 bn multi-year deal with European bank','NSE'],
+  [46,'HDFCBANK','Board Meeting Intimation','Intimation of board meeting for Q3 results','BSE'],
+  [64,'DIXON','Corporate Action','Fixes record date for 1:1 bonus issue','NSE'],
+  [92,'ADANIENT','Fund Raising','Board approves ₹16,600 Cr QIP','BSE'],
+  [118,'SUZLON','Order Win','Receives 402 MW wind order from a leading C&I customer','NSE'],
+  [148,'IRFC','Credit Rating','CRISIL reaffirms AAA/Stable long-term rating','BSE'],
+  [176,'BEL','Order Win','Bags ₹2,463 Cr order for radar systems from MoD','NSE'],
+  [204,'YESBANK','Shareholding','Disclosure under Reg 31(1) — promoter stake unchanged','BSE'],
+  [242,'TATAMOTORS','Scheme of Arrangement','Update on demerger of CV and PV businesses','NSE'],
+  [286,'ZOMATO','Name Change','Company name changed to Eternal Ltd — effective date','BSE'],
+  [318,'LICI','Actuarial','Embedded value update for Q3 FY26','NSE']]
+ .map(r=>`<tr><td class="tiny">${r[0]}m ago</td><td class="sym">${r[1]}</td>
+  <td><span class="pill b">${r[2]}</span></td><td>${r[3]}</td><td class="tiny">${r[4]}</td></tr>`).join(''));
+
+$('#tIns').innerHTML=T(['Date','Symbol','Person','Category','Type','#Qty','#Value ₹Cr','Mode'],
+ [[0,'INFY','N R Narayana Murthy (family)','Promoter Group','SELL',1200000,227.1,'Market Sale'],
+  [0,'BAJFINANCE','Rajeev Jain','KMP','SELL',24000,17.2,'ESOP Sale'],
+  [1,'DIXON','Sunil Vachani','Promoter','BUY',48000,74.0,'Market Purchase'],
+  [1,'TRENT','Tata Sons Pvt Ltd','Promoter','BUY',180000,115.6,'Market Purchase'],
+  [2,'PERSISTENT','Sandeep Kalra','KMP','SELL',18000,10.5,'ESOP Sale'],
+  [3,'POLYCAB','Inder T Jaisinghani','Promoter','BUY',22000,15.0,'Market Purchase'],
+  [4,'VBL','Ravi Jaipuria','Promoter','SELL',2400000,147.0,'Bulk Deal']]
+ .map(r=>`<tr><td>${dstr(D(-r[0]))}</td><td class="sym">${r[1]}</td><td>${r[2]}</td>
+  <td class="tiny">${r[3]}</td><td><span class="pill ${r[4]==='BUY'?'g':'r'}">${r[4]}</span></td>
+  <td class="num">${fmt(r[5],0)}</td><td class="num">${r[6]}</td><td class="tiny">${r[7]}</td></tr>`).join(''));
+
+$('#tShp').innerHTML=T(['Symbol','#Promoter %','#Δ QoQ','#FII %','#Δ QoQ','#DII %','#Δ QoQ','#Public %','#Pledge %'],
+ [['RELIANCE',50.33,0.00,21.84,-0.42,17.62,0.58,10.21,0.00],
+  ['HDFCBANK',0.00,0.00,47.82,-1.24,32.48,1.18,19.70,0.00],
+  ['DIXON',33.48,-0.12,18.62,1.84,24.16,0.92,23.74,0.00],
+  ['SUZLON',13.28,-0.94,22.48,2.16,8.42,1.24,55.82,0.00],
+  ['ADANIENT',74.89,0.00,12.42,-0.86,4.28,0.34,8.41,1.24],
+  ['IRFC',86.36,0.00,1.24,0.18,2.86,0.42,9.54,0.00],
+  ['YESBANK',0.00,0.00,24.86,3.42,32.18,-1.86,42.96,0.00],
+  ['TATAMOTORS',42.58,0.00,18.94,-0.62,16.42,0.88,22.06,0.00]]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td class="num">${r[1]}</td>
+  <td class="num ${cls(r[2])}">${r[2]?sgn(r[2]):'0.00'}</td><td class="num">${r[3]}</td>
+  <td class="num ${cls(r[4])}">${sgn(r[4])}</td><td class="num">${r[5]}</td>
+  <td class="num ${cls(r[6])}">${sgn(r[6])}</td><td class="num">${r[7]}</td>
+  <td class="num ${r[8]>0?'dn':'fl'}">${r[8]}</td></tr>`).join(''));
+
+$('#tPl').innerHTML=T(['Symbol','Promoter','#Shares Pledged','#% of Promoter Hold','#% of Total Cap','Change','Date'],
+ [['ADANIENT','SB Adani Family Trust',18400000,2.14,1.24,'Released 0.4%',0],
+  ['ADANIPORTS','Adani Tradeline LLP',26800000,1.86,1.02,'No change',1],
+  ['JSWSTEEL','JSW Techno Projects',42000000,3.28,1.72,'Created 0.6%',2],
+  ['SUZLON','Tanti Holdings',0,0.00,0.00,'Fully released',4],
+  ['YESBANK','—',0,0.00,0.00,'Nil',5]]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td>${r[1]}</td><td class="num">${fmt(r[2],0)}</td>
+  <td class="num">${r[3]}</td><td class="num">${r[4]}</td>
+  <td class="tiny">${r[5]}</td><td class="tiny">${dstr(D(-r[6]))}</td></tr>`).join(''));
+
+$('#tRes').innerHTML=T(['Symbol','Period','#Revenue ₹Cr','#YoY %','#PAT ₹Cr','#YoY %','#EBITDA %','Filed'],
+ [['RELIANCE','Q3 FY26',248200,7.4,21480,11.2,17.8,0],
+  ['TCS','Q3 FY26',64280,5.6,12840,8.4,26.2,2],
+  ['HCLTECH','Q3 FY26',30120,6.2,4620,9.8,23.4,4],
+  ['INFY','Q3 FY26',42180,4.8,6840,6.2,21.8,5],
+  ['HDFCBANK','Q3 FY26',86420,9.2,17280,12.4,'—',6],
+  ['ICICIBANK','Q3 FY26',48620,11.4,11840,14.6,'—',7],
+  ['ITC','Q3 FY26',19840,3.2,5620,4.8,34.2,8],
+  ['MARUTI','Q3 FY26',38240,12.8,3480,18.4,12.6,9]]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td>${r[1]}</td><td class="num">${fmt(r[2],0)}</td>
+  <td class="num ${cls(r[3])}">${sgn(r[3])}</td><td class="num">${fmt(r[4],0)}</td>
+  <td class="num ${cls(r[5])}">${sgn(r[5])}</td><td class="num">${r[6]}</td>
+  <td class="tiny">${dstr(D(-r[7]))}</td></tr>`).join(''));
+
+/* ==========================================================================
+   NEWS
+   ========================================================================== */
+const NEWS=[
+ ['stocks',12,'Nifty ends higher for a fourth session as IT and banks lead the rally','Moneycontrol','var(--acc)'],
+ ['ipo',26,'Meridian Renewables IPO subscribed 9.86× on day 2; NII portion leads at 14.6×','Business Standard','var(--pur)'],
+ ['gold',38,'Gold holds near record as traders position ahead of the Fed decision','Reuters','var(--gold)'],
+ ['bond',52,'India 10-year yield eases 3 bps after softer-than-expected CPI print','Bloomberg','var(--cy)'],
+ ['mf','1h','Equity mutual fund inflows hit a record ₹41,280 Cr; SIP book crosses ₹26,000 Cr','AMFI / ET','var(--grn)'],
+ ['policy','1h','SEBI tightens SME IPO norms: minimum promoter lock-in raised, offer-for-sale capped','SEBI Press Release','var(--red)'],
+ ['comm','2h','MCX crude futures slip 1.2% as OPEC+ signals a gradual output unwind','MCX / Reuters','var(--or)'],
+ ['earn','2h','Reliance Q3 net profit up 11.2% YoY; retail and Jio ARPU beat estimates','Company filing (BSE)','var(--acc)'],
+ ['global','3h','Fed holds rates steady, dot plot points to two cuts in 2026','Federal Reserve','var(--cy)'],
+ ['stocks','3h','FIIs turn net buyers after seven straight sessions of selling; DIIs add ₹2,060 Cr','NSE provisional','var(--acc)'],
+ ['gold','4h','Silver outperforms gold as industrial demand from solar hits a record','LBMA / Metals Focus','var(--gold)'],
+ ['ipo','4h','Kaveri Health Systems sets ₹640–672 band for its ₹3,150 Cr IPO; opens next week','RHP filing','var(--pur)'],
+ ['bond','5h','RBI announces ₹30,000 Cr OMO purchase to ease system liquidity','RBI','var(--cy)'],
+ ['policy','5h','Budget 2026 preview: markets watch capital-gains tax and capex allocation','Economic Times','var(--red)'],
+ ['comm','6h','Copper hits an 8-month high on Chinese stimulus hopes and LME stock drawdown','LME','var(--or)'],
+ ['mf','6h','Three small-cap funds reopen for lumpsum subscriptions after a 14-month pause','AMFI notice','var(--grn)'],
+ ['stocks','7h','Dixon Technologies fixes record date for its 1:1 bonus issue','BSE filing','var(--acc)'],
+ ['global','8h','Nikkei closes at a 34-year high as the yen weakens past 158','Nikkei','var(--cy)'],
+ ['earn','8h','TCS Q3 beats on margin; announces ₹27 interim dividend','Company filing (NSE)','var(--acc)'],
+ ['gold','9h','Sovereign Gold Bond series 2017-18 IV redeemed at ₹7,412 — a 3.1× return over 8 years','RBI','var(--gold)'],
+ ['comm','10h','Natural gas jumps 4% on a colder-than-normal US weather forecast','NYMEX','var(--or)'],
+ ['bond','11h','Corporate bond spreads narrow to a 3-year low as MF debt inflows accelerate','CRISIL','var(--cy)'],
+ ['ipo','12h','Grey market premium for Anandvan Speciality Chemicals rises to ₹34 (12%)','Unofficial GMP trackers','var(--pur)'],
+ ['policy','13h','NSE to launch weekly derivatives on two more indices from next month','NSE circular','var(--red)'],
+ ['mf','14h','Direct plans now account for 47% of individual equity AUM, up from 39% two years ago','AMFI data','var(--grn)'],
+ ['global','15h','ECB signals a pause; euro-area 10-year yields fall across the curve','ECB','var(--cy)'],
+ ['stocks','16h','Defence stocks rally after MoD clears ₹84,560 Cr of procurement proposals','PIB','var(--acc)'],
+ ['earn','18h','HDFC Bank Q3 NII grows 9.2%; NIM stable at 3.46%','Company filing','var(--acc)'],
+];
+function renderNews(cat,target,limit){
+  const list=NEWS.filter(n=>cat==='all'||n[0]===cat).slice(0,limit||99);
+  target.innerHTML=list.map(n=>`<div class="news"><div class="bar" style="background:${n[4]}"></div>
+   <div><div class="ttl">${n[2]}</div>
+   <div class="meta"><span class="src">${n[3]}</span>·<span>${typeof n[1]==='number'?n[1]+' min ago':n[1]+' ago'}</span>
+   ·<span class="pill m">${({stocks:'Equity',comm:'Commodities',gold:'Bullion',bond:'Fixed Income',
+     mf:'Mutual Funds',ipo:'IPO',policy:'Regulatory',global:'Global',earn:'Earnings'})[n[0]]}</span></div></div></div>`).join('');
+}
+renderNews('all',$('#newsList'));
+renderNews('all',$('#ovNews'),6);
+$$('[data-tabs="nw"] .tab').forEach(t=>t.addEventListener('click',()=>renderNews(t.dataset.t,$('#newsList'))));
+
+/* ==========================================================================
+   TOOLS
+   ========================================================================== */
+$('#sipForm').innerHTML=`
+ <div class="grid g3">
+  <div><div class="tiny">Monthly SIP (₹)</div><input class="search" id="sipA" type="number" value="15000" style="width:100%"></div>
+  <div><div class="tiny">Expected return (% p.a.)</div><input class="search" id="sipR" type="number" value="12" step="0.5" style="width:100%"></div>
+  <div><div class="tiny">Duration (years)</div><input class="search" id="sipY" type="number" value="15" style="width:100%"></div>
+ </div>`;
+function calcSip(){
+  const a=+$('#sipA').value||0, r=(+$('#sipR').value||0)/100/12, y=+$('#sipY').value||0, n=y*12;
+  const fv=r?a*((Math.pow(1+r,n)-1)/r)*(1+r):a*n, inv=a*n;
+  $('#sipInv').textContent='₹'+fmt(inv,0); $('#sipVal').textContent='₹'+fmt(fv,0);
+  $('#sipGain').textContent='₹'+fmt(fv-inv,0);
+  const yrs=[],iv=[],vv=[];
+  for(let k=1;k<=y;k++){const m=k*12;yrs.push('Y'+k);iv.push(a*m);
+    vv.push(r?a*((Math.pow(1+r,m)-1)/r)*(1+r):a*m);}
+  if(CH.sip){CH.sip.data.labels=yrs;CH.sip.data.datasets[0].data=iv;CH.sip.data.datasets[1].data=vv;CH.sip.update();}
+}
+['sipA','sipR','sipY'].forEach(id=>$('#'+id).oninput=calcSip);
+
+$('#tAlloc').innerHTML=T(['Risk Profile','#Equity','#Debt','#Gold','#Intl Equity','#Cash','Typical Investor'],
+ [['Conservative',25,55,10,5,5,'Retiree, capital preservation, &lt;3 yr horizon'],
+  ['Moderately Conservative',40,42,10,5,3,'Near-retirement, 3–5 yr horizon'],
+  ['Balanced',55,28,8,7,2,'Mid-career, 5–10 yr goals'],
+  ['Growth',70,15,7,8,0,'Young earner, 10–20 yr horizon'],
+  ['Aggressive',82,5,5,8,0,'High risk tolerance, 20 yr+ horizon']]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td class="num">${r[1]}%</td><td class="num">${r[2]}%</td>
+  <td class="num">${r[3]}%</td><td class="num">${r[4]}%</td><td class="num">${r[5]}%</td>
+  <td class="tiny">${r[6]}</td></tr>`).join(''));
+
+$('#tTax').innerHTML=T(['Asset','Holding for LTCG','#STCG Rate','#LTCG Rate','Exemption / Notes'],
+ [['Listed equity &amp; equity MF','&gt; 12 months','20%','12.5%','₹1.25 L LTCG exempt per FY; STT must be paid'],
+  ['Debt mutual funds (post Apr-2023)','No LTCG benefit','Slab rate','Slab rate','Indexation removed'],
+  ['Gold ETF / Gold MF','&gt; 12 months','Slab rate','12.5%','No indexation'],
+  ['Physical gold &amp; jewellery','&gt; 24 months','Slab rate','12.5%','3% GST on purchase'],
+  ['Sovereign Gold Bond','Held to maturity','Slab rate','Nil at maturity','Interest 2.5% taxed at slab'],
+  ['Listed bonds / debentures','&gt; 12 months','Slab rate','12.5%','Interest taxed at slab'],
+  ['G-Sec / T-Bills','&gt; 12 months','Slab rate','12.5%','No TDS via RBI Retail Direct'],
+  ['REIT / InvIT units','&gt; 12 months','20%','12.5%','Distribution split into interest/dividend/CoC'],
+  ['Unlisted shares','&gt; 24 months','Slab rate','12.5%','No indexation from FY25'],
+  ['Virtual Digital Assets','—','30%','30%','1% TDS &gt; ₹50k; no loss set-off'],
+  ['Dividends (all)','—','Slab rate','Slab rate','10% TDS above ₹10,000 per company']]
+ .map(r=>`<tr><td class="sym">${r[0]}</td><td>${r[1]}</td><td class="num">${r[2]}</td>
+  <td class="num" style="color:var(--gold)">${r[3]}</td><td class="tiny">${r[4]}</td></tr>`).join(''));
+
+/* FEEDS table */
+$('#tFeeds').innerHTML=T(['Source','Data','Endpoint / Path','Format'],
+ FEEDS.list.map(f=>`<tr><td class="sym">${f[0]}</td><td>${f[1]}</td>
+  <td><code>${f[2]}</code></td><td><span class="pill b">${f[3]}</span></td></tr>`).join(''));
+
+/* ==========================================================================
+   CHARTS
+   ========================================================================== */
+const CH={};
+Chart.defaults.color='#8497b5'; Chart.defaults.font.size=11;
+Chart.defaults.borderColor='rgba(34,48,74,.55)';
+const noLeg={plugins:{legend:{display:false}}};
+const base={responsive:true,maintainAspectRatio:false,interaction:{intersect:false,mode:'index'},
+ plugins:{legend:{labels:{boxWidth:10,boxHeight:10,usePointStyle:true,pointStyle:'circle'}}}};
+
+function drawGMP(ip){
+  const c=$('#cGMP'); if(!c||!window.Chart)return;
+  if(CH.gmp)CH.gmp.destroy();
+  CH.gmp=new Chart(c,{type:'line',data:{labels:['T-6','T-5','T-4','T-3','T-2','T-1','Today'],
+   datasets:[{data:ip.gmpT,borderColor:'#f0b90b',backgroundColor:'rgba(240,185,11,.14)',
+    fill:true,tension:.35,pointRadius:3,pointBackgroundColor:'#f0b90b'}]},
+   options:{...base,...noLeg,scales:{y:{ticks:{callback:v=>'₹'+v}}}}});
+}
+function drawSeg(ip){
+  const c=$('#cSeg'); if(!c||!window.Chart)return;
+  if(CH.seg)CH.seg.destroy();
+  CH.seg=new Chart(c,{type:'doughnut',data:{labels:ip.seg.map(s=>s[0]),
+   datasets:[{data:ip.seg.map(s=>s[1]),backgroundColor:['#4f8cff','#16c784','#f0b90b','#a78bfa','#fb923c','#22d3ee'],
+    borderColor:'#161f31',borderWidth:2}]},
+   options:{...base,cutout:'58%',plugins:{legend:{position:'right',labels:{boxWidth:9,boxHeight:9,font:{size:10},usePointStyle:true,pointStyle:'circle'}}}}});
+}
+function renderMFChart(){
+  const c=$('#cMF'); if(!c||!window.Chart)return;
+  const top=[...MF].sort((a,b)=>b[6]-a[6]).slice(0,12);
+  if(CH.mf)CH.mf.destroy();
+  CH.mf=new Chart(c,{type:'bar',data:{labels:top.map(m=>m[0].length>26?m[0].slice(0,26)+'…':m[0]),
+   datasets:[{label:'3Y CAGR %',data:top.map(m=>m[5]),backgroundColor:'#4f8cff',borderRadius:4},
+             {label:'5Y CAGR %',data:top.map(m=>m[6]),backgroundColor:'#16c784',borderRadius:4}]},
+   options:{...base,indexAxis:'y',scales:{x:{ticks:{callback:v=>v+'%'}}}}});
+}
+function buildCharts(sec){
+  if(!window.Chart)return;
+  if(sec==='overview'&&!CH.index){
+    CH.index=new Chart($('#cIndex'),{type:'line',
+      data:{labels:Array.from({length:60},(_,i)=>i),
+      datasets:[{data:INST.NIFTY50.hist,borderColor:'#4f8cff',backgroundColor:'rgba(79,140,255,.12)',
+       fill:true,tension:.3,pointRadius:0,borderWidth:2}]},
+      options:{...base,...noLeg,scales:{x:{display:false},y:{position:'right'}}}});
+    CH.asset=new Chart($('#cAsset'),{type:'bar',
+      data:{labels:['Nifty 50','Midcap 100','Smallcap','Gold (₹)','Silver (₹)','G-Sec','Corp Bond','Nasdaq','REITs','Crypto'],
+      datasets:[{data:[12.4,24.8,21.2,28.6,32.4,8.2,8.9,26.8,9.4,58.2],
+       backgroundColor:['#4f8cff','#4f8cff','#4f8cff','#f0b90b','#c0c0c0','#22d3ee','#22d3ee','#a78bfa','#fb923c','#16c784'],
+       borderRadius:5}]},
+      options:{...base,...noLeg,scales:{y:{ticks:{callback:v=>v+'%'}}}}});
+  }
+  if(sec==='comm'&&!CH.comm){
+    const L=Array.from({length:12},(_,i)=>['Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan'][i]);
+    const mk=(n,c,d)=>({label:n,data:d,borderColor:c,tension:.32,pointRadius:0,borderWidth:2});
+    CH.comm=new Chart($('#cComm'),{type:'line',data:{labels:L,datasets:[
+      mk('Gold','#f0b90b',[100,104,109,107,113,118,122,126,124,129,132,134]),
+      mk('Silver','#c0c0c0',[100,106,114,110,119,126,131,138,134,142,148,152]),
+      mk('Crude','#fb923c',[100,98,95,101,97,92,89,94,91,88,86,90]),
+      mk('Copper','#22d3ee',[100,103,107,105,110,108,112,116,114,118,121,124]),
+      mk('Nat Gas','#a78bfa',[100,92,86,94,88,82,91,102,96,108,118,112])]},
+      options:{...base,scales:{y:{title:{display:true,text:'Rebased = 100'}}}}});
+  }
+  if(sec==='gold'&&!CH.gold){
+    const L=['Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan'];
+    CH.gold=new Chart($('#cGold'),{type:'line',data:{labels:L,datasets:[
+      {label:'Gold ₹/10g',data:[62400,64800,67200,66100,69400,71800,73600,75200,74100,76400,77100,77840],
+       borderColor:'#f0b90b',backgroundColor:'rgba(240,185,11,.10)',fill:true,tension:.32,pointRadius:0,borderWidth:2,yAxisID:'y'},
+      {label:'Silver ₹/kg',data:[71200,74800,79400,76800,82400,86200,89400,92800,90200,94600,91800,92150],
+       borderColor:'#c0c0c0',tension:.32,pointRadius:0,borderWidth:2,yAxisID:'y1'}]},
+      options:{...base,scales:{y:{position:'left'},y1:{position:'right',grid:{display:false}}}}});
+  }
+  if(sec==='bonds'&&!CH.curve){
+    CH.curve=new Chart($('#cCurve'),{type:'line',
+      data:{labels:['3M','6M','1Y','2Y','3Y','5Y','7Y','10Y','15Y','20Y','30Y','40Y'],datasets:[
+       {label:'India G-Sec',data:[6.44,6.49,6.55,6.48,6.52,6.59,6.64,6.71,6.92,7.01,7.05,7.08],
+        borderColor:'#f0b90b',backgroundColor:'rgba(240,185,11,.10)',fill:true,tension:.3,pointRadius:3,borderWidth:2},
+       {label:'US Treasury',data:[4.32,4.30,4.24,4.27,4.32,4.38,4.45,4.51,4.68,4.74,4.73,null],
+        borderColor:'#4f8cff',tension:.3,pointRadius:3,borderWidth:2}]},
+      options:{...base,scales:{y:{ticks:{callback:v=>v+'%'}}}}});
+    CH.y10=new Chart($('#cY10'),{type:'bar',
+      data:{labels:BONDS.filter(b=>b[0].endsWith('10')).map(b=>b[4]),
+      datasets:[{data:BONDS.filter(b=>b[0].endsWith('10')).map(b=>b[2]),
+       backgroundColor:BONDS.filter(b=>b[0].endsWith('10')).map(b=>b[4]==='India'?'#f0b90b':'#4f8cff'),borderRadius:5}]},
+      options:{...base,...noLeg,scales:{y:{ticks:{callback:v=>v+'%'}},x:{ticks:{maxRotation:60,minRotation:45}}}}});
+  }
+  if(sec==='global'&&!CH.glob){
+    CH.glob=new Chart($('#cGlobal'),{type:'bar',
+      data:{labels:['India','US','Japan','Europe','China','Brazil','Korea','Taiwan','UK','Australia'],
+      datasets:[{label:'CY Return %',data:[12.4,24.8,18.2,9.4,14.6,-3.2,6.8,28.4,7.2,10.1],
+       backgroundColor:c=>c.raw<0?'#ea3943':'#16c784',borderRadius:5}]},
+      options:{...base,...noLeg,scales:{y:{ticks:{callback:v=>v+'%'}}}}});
+  }
+  if(sec==='mf'){
+    renderMFChart();
+    if(!CH.mfcat)CH.mfcat=new Chart($('#cMFCat'),{type:'bar',
+      data:{labels:['Small Cap','Mid Cap','Flexi Cap','Large Cap','ELSS','Index','Hybrid','Debt'],
+      datasets:[{label:'1Y',data:[26.4,28.4,24.2,20.8,22.4,18.4,20.6,8.4],backgroundColor:'#4f8cff',borderRadius:4},
+                {label:'3Y CAGR',data:[24.6,26.2,21.8,17.4,19.2,15.6,17.8,6.8],backgroundColor:'#16c784',borderRadius:4},
+                {label:'5Y CAGR',data:[32.8,29.4,25.4,18.6,22.8,16.4,18.4,6.4],backgroundColor:'#f0b90b',borderRadius:4}]},
+      options:{...base,scales:{y:{ticks:{callback:v=>v+'%'}}}}});
+  }
+  if(sec==='tools'&&!CH.sip){
+    CH.sip=new Chart($('#cSip'),{type:'line',data:{labels:[],datasets:[
+      {label:'Invested',data:[],borderColor:'#8497b5',backgroundColor:'rgba(132,151,181,.10)',fill:true,tension:.25,pointRadius:0},
+      {label:'Value',data:[],borderColor:'#16c784',backgroundColor:'rgba(22,199,132,.14)',fill:true,tension:.25,pointRadius:0}]},
+      options:{...base,scales:{y:{ticks:{callback:v=>'₹'+(v/100000).toFixed(1)+'L'}}}}});
+    calcSip();
+  }
+  if(sec==='ipo'&&!CH.gmp)renderIPO(curIPO);
+}
+
+/* ==========================================================================
+   BOOT
+   ========================================================================== */
+clock(); setInterval(clock,1000);
+renderCal(); renderCA(); renderIPO(0);
+paint(); buildCharts('overview');
+setTimeout(()=>{paint();},120);
+SIM.timer=setInterval(()=>{if(SIM.on)step();},2200);
+window.addEventListener('resize',()=>{paint();});
+</script>
+</body>
+</html>
