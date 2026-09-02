@@ -1402,7 +1402,7 @@ $('#ipoStats').innerHTML=[
  ['Avg Listing Gain (CY)','+21.4%','across 68 mainboard IPOs','y'],
  ['Total Raised (CY)','₹1.42 L Cr','mainboard + SME','p']
 ].map(s=>`<div class="tile"><div class="nm">${s[0]}</div><div class="px" style="font-size:20px">${s[1]}</div>
- <div class="ch"><span class="pill ${s[3]}">${s[2]}</span></div></div>`).join(''));
+ <div class="ch"><span class="pill ${s[3]}">${s[2]}</span></div></div>`).join('');
 
 function ipoCard(ip,ix){
   const gp=ip.band==='TBA'?null:((ip.gmp/parseFloat(ip.band.split('₹').pop()))*100);
